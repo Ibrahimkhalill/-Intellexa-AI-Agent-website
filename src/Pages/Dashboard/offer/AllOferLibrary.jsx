@@ -5,6 +5,9 @@ import { useParams } from 'react-router-dom';
 const AllOferLibrary = () => {
  const { name } = useParams();
 
+
+
+
   const hotelOffers = [
     {
       id: 1,
@@ -77,6 +80,7 @@ const AllOferLibrary = () => {
           {offer.description}
         </p>
       </div>
+      {/* <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Error, a commodi pariatur deleniti sunt itaque nam expedita fugit deserunt porro minus tempore.</p> */}
     </div>
   );
 
