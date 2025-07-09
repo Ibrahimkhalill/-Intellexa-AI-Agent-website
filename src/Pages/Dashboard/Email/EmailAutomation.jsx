@@ -1,15 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
-  Home, 
-  MessageCircle, 
-  Workflow, 
-  User, 
-  LogOut,
   Mail,
   Search,
   Settings,
   Plus,
-  Send
 } from 'lucide-react';
 
 const EmailAutomation = () => {
@@ -63,9 +57,6 @@ const EmailAutomation = () => {
 
   return (
     <div className="min-h-[83vh] bg-[#F2F4F3] flex">
-      {/* Sidebar */}
-    
-
       {/* Main Content */}
       <div className="flex-1 flex">
         {/* Email List */}
