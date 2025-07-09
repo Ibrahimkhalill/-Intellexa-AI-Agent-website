@@ -4,8 +4,6 @@ import Signup from "../Pages/Authentication/Signup";
 import SignIn from "../Pages/Authentication/SignIn";
 import ProfilePage from "../Pages/Authentication/Profile/ProfilePage";
 import HomePage from "../Pages/Dashboard/HomePage/HomePage";
-import Upgrade from "../Pages/Dashboard/Upgrade/Upgrade";
-import UploadOneFile from "../Pages/Dashboard/HomePage/UploadOneFile";
 import OtpVerification from "../Pages/Authentication/OtpVerification";
 import ForgetEmail from "../Pages/Authentication/ForgetEmail";
 import EmailAutomation from "../Pages/Dashboard/Email/EmailAutomation";
@@ -14,6 +12,7 @@ import BookingList from "../Pages/Dashboard/booking/BookingList";
 import OfferLibrary from "../Pages/Dashboard/offer/OfferLibrary";
 import AllOferLibrary from "../Pages/Dashboard/offer/AllOferLibrary";
 import BookingDeatils from "../Pages/Dashboard/booking/BookingDeatils";
+import BookingForm from "../Pages/Dashboard/BookingForm/BookingForm";
 const router = createBrowserRouter([
   {
     path: "/",
@@ -24,20 +23,12 @@ const router = createBrowserRouter([
         element: <HomePage/>
       },
       {
-        path: "/upload_one",
-        element: <UploadOneFile/>
-      },
-      {
         path: "/booking-list",
         element: <BookingList/>
       },
       {
         path: "/offer-library",
         element: <OfferLibrary/>
-      },
-      {
-        path: "/upgrade",
-        element: <Upgrade/>
       },
       {
         path: "/email-automation",
@@ -59,6 +50,10 @@ const router = createBrowserRouter([
         path: "/booking-deatils",
         element: <BookingDeatils/>
       },
+      {
+        path: "/booking/:id",
+        element: <BookingForm/>
+      }
 
     ],
   },

@@ -1,7 +1,5 @@
 import React from 'react';
-import { ChevronRight ,ArrowRight } from 'lucide-react';
-
-// Import images (replace with your actual image paths)
+import { ArrowRight } from 'lucide-react';
 import flightImg from '../../../assets/images/flight.svg';
 import flightImg1 from '../../../assets/images/fliegt_book.svg';
 import restaurantImg from '../../../assets/images/restaurant.svg';
@@ -13,25 +11,11 @@ import hotelImg from '../../../assets/images/hotel.svg';
 import aiImg from '../../../assets/images/ChatGPT.svg';
 import documentImg from '../../../assets/images/Live.svg';
 import BookNow from '../../../assets/images/BookNow.svg';
-import fliegt_book from '../../../assets/images/fliegt_book.svg';
 import Hotel_book from '../../../assets/images/Hotel_book.svg';
 import Birthday_book from '../../../assets/images/birthday_books.svg';
 import res from '../../../assets/images/res.svg';
 
 const WorkFlow = () => {
-  const workflowData = [
-    { name: 'Email Automation', status: 'Active', created: '04/15/2024', statusColor: 'text-green-500' },
-    { name: 'Hotel Reservation', status: 'Active', created: '04/15/2024', statusColor: 'text-green-500' },
-    { name: 'Email Automation', status: 'Inactive', created: '04/15/2024', statusColor: 'text-gray-500' },
-    { name: 'Document Processing', status: 'Processing', created: '04/15/2024', statusColor: 'text-blue-500' }
-  ];
-
-  const recentActivity = [
-    { name: 'Email Automation', created: '04/15/2024' },
-    { name: 'Email Automation', created: '04/15/2024' },
-    { name: 'Email Automation', created: '04/15/2024' },
-    { name: 'Email Automation', created: '04/15/2024' }
-  ];
 
   const automationTemplates = [
     {
@@ -89,7 +73,7 @@ const WorkFlow = () => {
                     <div className="flex items-center justify-center space-x-2 mb-4">
                       {template.icons.map((image, iconIndex) => (
                         <React.Fragment key={iconIndex}>
-                          <div className="w-14 h-14 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center">
                             <img
                               src={image}
                               alt={`${template.title} icon ${iconIndex + 1}`}

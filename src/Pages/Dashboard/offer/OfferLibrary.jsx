@@ -93,7 +93,9 @@ const OfferLibrary = () => {
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {hotelOffers.map((offer) => (
-                  <OfferCard key={offer.id} offer={offer} />
+                  <Link key={offer.id} to={`/booking/${offer.id}`} className="block">
+                  <OfferCard offer={offer} />
+                  </Link>
                 ))}
               </div>
             </div>
