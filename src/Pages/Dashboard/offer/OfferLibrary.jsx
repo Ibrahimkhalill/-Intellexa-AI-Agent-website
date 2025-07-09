@@ -1,5 +1,3 @@
-import React, { useState } from 'react';
-import { Home, MessageSquare, Workflow, BookOpen, User, LogOut, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const OfferLibrary = () => {
@@ -51,14 +49,6 @@ const OfferLibrary = () => {
       description: 'Authentic taste, cozy ambiance, and a menu loved by locals. Try our signature dishes today!',
       imageAlt: 'Chef preparing food in kitchen'
     }
-  ];
-
-  const sidebarItems = [
-    { name: 'Home', icon: Home, active: false },
-    { name: 'AI Chat', icon: MessageSquare, active: false },
-    { name: 'Work Flow', icon: Workflow, active: false },
-    { name: 'Offer Library', icon: BookOpen, active: true },
-    { name: 'Booking List', icon: Calendar, active: false },
   ];
 
   const OfferCard = ({ offer }) => (
