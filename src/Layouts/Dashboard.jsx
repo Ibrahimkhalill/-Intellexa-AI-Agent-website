@@ -61,7 +61,7 @@ const Dashboard = () => {
     },
     {
       title: "AI Chat",
-      path: "/upload_essay",
+      path: "/noir_chat",
       icon: iconMappings.Book,
       role: "user",
     },
