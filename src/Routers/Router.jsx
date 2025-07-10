@@ -4,10 +4,6 @@ import Signup from "../Pages/Authentication/Signup";
 import SignIn from "../Pages/Authentication/SignIn";
 import ProfilePage from "../Pages/Authentication/Profile/ProfilePage";
 import HomePage from "../Pages/Dashboard/HomePage/HomePage";
-import UploadEssay from "../Pages/Dashboard/UploadEssay/UploadEssay";
-import Upgrade from "../Pages/Dashboard/Upgrade/Upgrade";
-import UploadOneFile from "../Pages/Dashboard/HomePage/UploadOneFile";
-import UploadComparison from "../Pages/Dashboard/UploadEssay/UploadComparison";
 import OtpVerification from "../Pages/Authentication/OtpVerification";
 import ForgetEmail from "../Pages/Authentication/ForgetEmail";
 import EmailAutomation from "../Pages/Dashboard/Email/EmailAutomation";
@@ -16,6 +12,8 @@ import BookingList from "../Pages/Dashboard/booking/BookingList";
 import OfferLibrary from "../Pages/Dashboard/offer/OfferLibrary";
 import AllOferLibrary from "../Pages/Dashboard/offer/AllOferLibrary";
 import BookingDeatils from "../Pages/Dashboard/booking/BookingDeatils";
+import BookingForm from "../Pages/Dashboard/BookingForm/BookingForm";
+import Search from "../Pages/Dashboard/Worlflow/Search";
 const router = createBrowserRouter([
   {
     path: "/",
@@ -26,10 +24,6 @@ const router = createBrowserRouter([
         element: <HomePage/>
       },
       {
-        path: "/upload_one",
-        element: <UploadOneFile/>
-      },
-      {
         path: "/booking-list",
         element: <BookingList/>
       },
@@ -38,12 +32,12 @@ const router = createBrowserRouter([
         element: <OfferLibrary/>
       },
       {
-        path: "/upgrade",
-        element: <Upgrade/>
-      },
-      {
         path: "/email-automation",
         element: <EmailAutomation/>
+      },
+      {
+        path: "/ai_search",
+        element: <Search/>
       },
       {
         path: "/worlflow",
@@ -61,6 +55,10 @@ const router = createBrowserRouter([
         path: "/booking-deatils",
         element: <BookingDeatils/>
       },
+      {
+        path: "/booking/:id",
+        element: <BookingForm/>
+      }
 
     ],
   },

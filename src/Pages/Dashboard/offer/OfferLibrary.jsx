@@ -1,5 +1,3 @@
-import React, { useState } from 'react';
-import { Home, MessageSquare, Workflow, BookOpen, User, LogOut, Calendar } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const OfferLibrary = () => {
@@ -53,14 +51,6 @@ const OfferLibrary = () => {
     }
   ];
 
-  const sidebarItems = [
-    { name: 'Home', icon: Home, active: false },
-    { name: 'AI Chat', icon: MessageSquare, active: false },
-    { name: 'Work Flow', icon: Workflow, active: false },
-    { name: 'Offer Library', icon: BookOpen, active: true },
-    { name: 'Booking List', icon: Calendar, active: false },
-  ];
-
   const OfferCard = ({ offer }) => (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
       <div className="aspect-[16/10] bg-gray-200 relative overflow-hidden">
@@ -103,7 +93,9 @@ const OfferLibrary = () => {
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {hotelOffers.map((offer) => (
-                  <OfferCard key={offer.id} offer={offer} />
+                  <Link key={offer.id} to={`/booking/${offer.id}`} className="block">
+                  <OfferCard offer={offer} />
+                  </Link>
                 ))}
               </div>
             </div>

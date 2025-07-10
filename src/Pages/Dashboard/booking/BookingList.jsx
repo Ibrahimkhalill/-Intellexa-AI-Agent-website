@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Home, MessageSquare, Workflow, BookOpen, User, LogOut, Filter, Settings } from 'lucide-react';
+import { useState } from 'react';
+import { Settings } from 'lucide-react';
 import BookingDetailsModal from '../../../components/modal/BookingDetailsModal';
 import { useNavigate } from 'react-router-dom';
 
@@ -34,13 +34,7 @@ const BookingList = () => {
     }
   };
 
-  const sidebarItems = [
-    { name: 'Home', icon: Home, active: false },
-    { name: 'AI Chat', icon: MessageSquare, active: false },
-    { name: 'Work Flow', icon: Workflow, active: false },
-    { name: 'Offer Library', icon: BookOpen, active: false },
-    { name: 'Booking List', icon: Settings, active: true },
-  ];
+  
   const [isOpen, setIsOpen] = useState(false)
   const navigate = useNavigate()
 
@@ -53,9 +47,6 @@ const BookingList = () => {
 
   return (
     <div className="flex h-screen bg-gray-50 relative">
-      {/* Sidebar */}
-     
-
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
         <div className="p-8">
