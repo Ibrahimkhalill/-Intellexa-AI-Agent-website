@@ -14,6 +14,7 @@ import AllOferLibrary from "../Pages/Dashboard/offer/AllOferLibrary";
 import BookingDeatils from "../Pages/Dashboard/booking/BookingDeatils";
 import BookingForm from "../Pages/Dashboard/BookingForm/BookingForm";
 import Search from "../Pages/Dashboard/Worlflow/Search";
+import NoirChat from "../Pages/Dashboard/NoirChat/NoirChat";
 const router = createBrowserRouter([
   {
     path: "/",
@@ -22,6 +23,10 @@ const router = createBrowserRouter([
       {
         path: "/",
         element: <HomePage/>
+      },
+      {
+        path: "/noir_chat",
+        element: <NoirChat/>
       },
       {
         path: "/booking-list",

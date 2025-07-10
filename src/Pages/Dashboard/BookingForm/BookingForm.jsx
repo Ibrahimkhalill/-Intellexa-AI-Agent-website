@@ -2,7 +2,6 @@ import { useState } from "react";
 import { ChevronDown, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function BookingForm() {
-  // Get today's date and 2 days later
   const today = new Date();
   const twoDaysLater = new Date(today);
   twoDaysLater.setDate(today.getDate() + 2);
@@ -18,7 +17,7 @@ export default function BookingForm() {
     specialRequests: "",
   });
 
-  const [calendarOpen, setCalendarOpen] = useState(null); // 'checkin' or 'checkout'
+  const [calendarOpen, setCalendarOpen] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const handleInputChange = (field, value) => {
@@ -63,13 +62,10 @@ export default function BookingForm() {
     const startDay = firstDay.getDay();
 
     const days = [];
-
-    // Add empty cells for days before the first day of the month
     for (let i = 0; i < startDay; i++) {
       days.push(null);
     }
 
-    // Add days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       days.push(new Date(year, month, day));
     }
@@ -81,7 +77,6 @@ export default function BookingForm() {
     const formattedDate = formatDate(date);
     if (calendarOpen === "checkin") {
       handleInputChange("checkIn", formattedDate);
-      // If check-in is selected and it's after check-out, update check-out to be 2 days later
       const checkOutDate = parseDate(formData.checkOut);
       if (date >= checkOutDate) {
         const newCheckOut = new Date(date);
@@ -96,14 +91,12 @@ export default function BookingForm() {
 
   const isDateDisabled = (date) => {
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset time to start of day
-    date.setHours(0, 0, 0, 0); // Reset time to start of day
+    today.setHours(0, 0, 0, 0); 
+    date.setHours(0, 0, 0, 0); 
 
     if (calendarOpen === "checkin") {
-      // For check-in, disable past dates
       return date < today;
     } else if (calendarOpen === "checkout") {
-      // For check-out, disable past dates and dates before/equal to check-in
       const checkInDate = parseDate(formData.checkIn);
       checkInDate.setHours(0, 0, 0, 0);
       return date < today || date <= checkInDate;
@@ -139,7 +132,6 @@ export default function BookingForm() {
 
     return (
       <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4 z-50 w-72">
-        {/* Calendar Header */}
         <div className="flex items-center justify-between mb-4">
           <button
             type="button"
@@ -160,7 +152,6 @@ export default function BookingForm() {
           </button>
         </div>
 
-        {/* Day Names */}
         <div className="grid grid-cols-7 gap-1 mb-2">
           {dayNames.map((day) => (
             <div
@@ -172,7 +163,6 @@ export default function BookingForm() {
           ))}
         </div>
 
-        {/* Calendar Days */}
         <div className="grid grid-cols-7 gap-1">
           {days.map((day, index) => {
             const isDisabled = day ? isDateDisabled(day) : true;
@@ -316,7 +306,6 @@ export default function BookingForm() {
               </div>
             </div>
 
-            {/* Dates */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Exact dates for your stay
@@ -375,7 +364,6 @@ export default function BookingForm() {
               </div>
             </div>
 
-            {/* Room Preference */}
             <div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
