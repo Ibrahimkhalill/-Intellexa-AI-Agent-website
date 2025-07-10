@@ -14,14 +14,17 @@ import BookNow from "../../../assets/images/BookNow.svg";
 import Hotel_book from "../../../assets/images/Hotel_book.svg";
 import Birthday_book from "../../../assets/images/birthday_books.svg";
 import res from "../../../assets/images/res.svg";
+import { useNavigate } from "react-router-dom";
 
 const WorkFlow = () => {
+  const navigate = useNavigate();
   const automationTemplates = [
     {
       title: "Flight Booking",
       description:
         "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
       icons: [flightImg, aiImg, flightImg1],
+      link: "/ai_search",
     },
     {
       title: "Restaurant Booking",
@@ -34,18 +37,21 @@ const WorkFlow = () => {
       description:
         "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
       icons: [spaImg, aiImg, BookNow],
+      link: "/ai_search",
     },
     {
       title: "Birthday Booking",
       description:
         "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
       icons: [birthdayImg, aiImg, Birthday_book],
+      link: "/ai_search",
     },
     {
       title: "Concert Tickets Booking",
       description:
         "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
       icons: [concertImg, aiImg, documentImg],
+      link: "/ai_search",
     },
 
     {
@@ -53,6 +59,7 @@ const WorkFlow = () => {
       description:
         "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
       icons: [spaImg, aiImg, BookNow],
+      link: "/ai_search",
     },
 
     {
@@ -67,6 +74,7 @@ const WorkFlow = () => {
       description:
         "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
       icons: [hotelImg, aiImg, res],
+      link: "/ai_search",
     },
   ];
 
@@ -79,6 +87,7 @@ const WorkFlow = () => {
           {automationTemplates.map((template, index) => (
             <div
               key={index}
+              onClick={() => template.link && navigate(template.link)}
               className="bg-[#F5F4F0] rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer"
             >
               <div className="flex items-center justify-center space-x-2 mb-4">

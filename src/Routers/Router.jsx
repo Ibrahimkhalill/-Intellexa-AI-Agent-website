@@ -13,6 +13,7 @@ import OfferLibrary from "../Pages/Dashboard/offer/OfferLibrary";
 import AllOferLibrary from "../Pages/Dashboard/offer/AllOferLibrary";
 import BookingDeatils from "../Pages/Dashboard/booking/BookingDeatils";
 import BookingForm from "../Pages/Dashboard/BookingForm/BookingForm";
+import Search from "../Pages/Dashboard/Worlflow/Search";
 const router = createBrowserRouter([
   {
     path: "/",
@@ -33,6 +34,10 @@ const router = createBrowserRouter([
       {
         path: "/email-automation",
         element: <EmailAutomation/>
+      },
+      {
+        path: "/ai_search",
+        element: <Search/>
       },
       {
         path: "/worlflow",
