@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { User, Bot, Home, MessageSquare, Workflow, BookOpen, List, UserCircle, LogOut, Mic, Sparkles, Star, Zap } from 'lucide-react';
+import { User, Bot, Mic, Sparkles, Star, Zap } from 'lucide-react';
 
 const NoirChat = () => {
   const [messages, setMessages] = useState([]);
@@ -170,10 +170,10 @@ const NoirChat = () => {
           {isTyping && (
             <div className="flex justify-start animate-fade-in">
               <div className="flex max-w-4xl">
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-r from-gray-700 to-gray-800 mr-4 flex items-center justify-center shadow-lg">
-                  <Bot className="w-5 h-5 text-white" />
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-100 mr-4 flex items-center justify-center shadow-lg">
+                  <Bot className="w-5 h-5 text-black" />
                 </div>
-                <div className="px-6 py-4 rounded-2xl bg-gradient-to-r from-gray-800/90 to-gray-900/90 border border-gray-700/50 backdrop-blur-sm">
+                <div className="px-6 py-4 rounded-2xl bg-gray-100 border-gray-700/50 backdrop-blur-sm">
                   <div className="flex items-center space-x-2">
                     <div className="flex space-x-1">
                       <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
