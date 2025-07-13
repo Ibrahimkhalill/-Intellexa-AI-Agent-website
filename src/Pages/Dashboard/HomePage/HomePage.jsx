@@ -1,19 +1,5 @@
-import React from "react";
-import { ChevronRight, ArrowRight } from "lucide-react";
-import flightImg from "../../../assets/images/flight.svg";
-import flightImg1 from "../../../assets/images/fliegt_book.svg";
-import restaurantImg from "../../../assets/images/restaurant.svg";
-import spaImg from "../../../assets/images/Spa.svg";
-import birthdayImg from "../../../assets/images/birthday.svg";
-import concertImg from "../../../assets/images/concert.svg";
-import emailImg from "../../../assets/images/email.svg";
-import hotelImg from "../../../assets/images/hotel.svg";
-import aiImg from "../../../assets/images/ChatGPT.svg";
-import documentImg from "../../../assets/images/Live.svg";
-import BookNow from "../../../assets/images/BookNow.svg";
-import Hotel_book from "../../../assets/images/Hotel_book.svg";
-import Birthday_book from "../../../assets/images/birthday_books.svg";
-import res from "../../../assets/images/res.svg";
+import { ChevronRight } from "lucide-react";
+import AutomationAiSupport from "../Worlflow/AutomationAiSupport";
 
 const HomePage = () => {
   const workflowData = [
@@ -64,72 +50,64 @@ const HomePage = () => {
     }
   };
 
-  const automationTemplates = [
-    {
-      title: "Flight Booking",
-      description:
-        "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-      icons: [flightImg, aiImg, flightImg1],
-    },
-    {
-      title: "Restaurant Booking",
-      description:
-        "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-      icons: [restaurantImg, aiImg, Hotel_book],
-    },
-    {
-      title: "Spa Booking",
-      description:
-        "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-      icons: [spaImg, aiImg, BookNow],
-    },
-    {
-      title: "Birthday Booking",
-      description:
-        "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-      icons: [birthdayImg, aiImg, Birthday_book],
-    },
-    {
-      title: "Concert Tickets Booking",
-      description:
-        "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-      icons: [concertImg, aiImg, documentImg],
-    },
+  // const automationTemplates = [
+  //   {
+  //     title: "Flight Booking",
+  //     description:
+  //       "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
+  //     icons: [flightImg, aiImg, flightImg1],
+  //   },
+  //   {
+  //     title: "Restaurant Booking",
+  //     description:
+  //       "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
+  //     icons: [restaurantImg, aiImg, Hotel_book],
+  //   },
+  //   {
+  //     title: "Spa Booking",
+  //     description:
+  //       "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
+  //     icons: [spaImg, aiImg, BookNow],
+  //   },
+  //   {
+  //     title: "Birthday Booking",
+  //     description:
+  //       "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
+  //     icons: [birthdayImg, aiImg, Birthday_book],
+  //   },
+  //   {
+  //     title: "Concert Tickets Booking",
+  //     description:
+  //       "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
+  //     icons: [concertImg, aiImg, documentImg],
+  //   },
 
-    {
-      title: "Spa Booking",
-      description:
-        "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-      icons: [spaImg, aiImg, BookNow],
-    },
+  //   {
+  //     title: "Spa Booking",
+  //     description:
+  //       "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
+  //     icons: [spaImg, aiImg, BookNow],
+  //   },
 
-    {
-      title: "Email Automation",
-      description:
-        "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-      icons: [emailImg, aiImg, emailImg],
-    },
-    {
-      title: "Hotel Reservation",
-      description:
-        "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-      icons: [hotelImg, aiImg, res],
-    },
-  ];
+  //   {
+  //     title: "Email Automation",
+  //     description:
+  //       "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
+  //     icons: [emailImg, aiImg, emailImg],
+  //   },
+  //   {
+  //     title: "Hotel Reservation",
+  //     description:
+  //       "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
+  //     icons: [hotelImg, aiImg, res],
+  //   },
+  // ];
 
   return (
     <div className="min-h-screen  flex">
-      {/* Sidebar */}
-
       {/* Main Content */}
       <div className="flex-1 p-8">
-        {/* Top Section */}
         <div className=" mb-8">
-          {/* Workflow Overview */}
-          <div className="">
-            
-
-            {/* Table */}
             <div className="bg-gradient-to-r from-[#fffcf5] to-white rounded-lg border border-gray-50 p-4 overflow-hidden shadow-sm">
                 <div className="flex items-center justify-between mb-6">
               <h1 className="text-2xl font-semibold text-gray-900">
@@ -186,11 +164,11 @@ const HomePage = () => {
                 </tbody>
               </table>
             </div>
-          </div>
         </div>
 
         {/* Automation Templates Grid */}
-        <div className="grid grid-cols-4 gap-6">
+        <AutomationAiSupport/>
+        {/* <div className="grid grid-cols-4 gap-6">
           {automationTemplates.map((template, index) => (
             <div
               key={index}
@@ -220,7 +198,7 @@ const HomePage = () => {
               </p>
             </div>
           ))}
-        </div>
+        </div> */}
       </div>
     </div>
   );
