@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { X, Minus, Plus, ChevronDown, Calendar } from 'lucide-react';
 
 const BookingDetailsModal = ({isOpen, setIsOpen}) => {

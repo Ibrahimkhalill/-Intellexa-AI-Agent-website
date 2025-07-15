@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 const AllOferLibrary = () => {
   const { name } = useParams();
@@ -79,8 +79,7 @@ const AllOferLibrary = () => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {hotelOffers.map((offer) => (
-                  <div
-                    key={offer.id}
+                  <Link key={offer.id} to={`/booking/${offer.id}`}
                     className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
                   >
                     <div className="aspect-[16/10] bg-gray-200 relative overflow-hidden">
@@ -98,7 +97,7 @@ const AllOferLibrary = () => {
                         {offer.description}
                       </p>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </div>
