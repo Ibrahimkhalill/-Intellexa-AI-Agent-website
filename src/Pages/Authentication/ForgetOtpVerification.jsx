@@ -1,11 +1,10 @@
 import { useForm } from "react-hook-form";
 import { useState, useEffect } from "react";
 import { FaLeftLong } from "react-icons/fa6";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import axiosInstance from "../../components/axiosinstance";
-import { useAuth } from "../../components/authContext";
 
-const OtpVerification = () => {
+const ForgetOtpVerification = ({ user_id, onSuccess }) => {
   const {
     register,
     handleSubmit,
@@ -18,16 +17,14 @@ const OtpVerification = () => {
   const [apiError, setApiError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
-  const { login } = useAuth();
 
   // Retrieve user_id from location state or localStorage
-  const userId = location.state?.user_id || null;
+  const userId = user_id;
 
   useEffect(() => {
     // If userId comes from location, store in localStorage
-    if (location.state?.user_id) {
-      localStorage.setItem("otp_user_id", location.state.user_id);
+    if (userId) {
+      localStorage.setItem("otp_user_id", userId);
     }
 
     const storedUserId = localStorage.getItem("otp_user_id");
@@ -70,18 +67,13 @@ const OtpVerification = () => {
 
     try {
       const response = await axiosInstance.post(
-        "api/auth/otp/verify/",
+        "api/auth/reset/otp-verify/",
         payload
       );
       console.log("OTP Verification successful:", response.data);
-      login(
-        response.data.access_token,
-        response.data.email_address,
-        response.data.profile.first_name,
-        response.data.refresh_token
-      );
+
       localStorage.removeItem("otp_user_id");
-      navigate("/");
+      onSuccess(response.data.user_id, response.data.secret_key);
     } catch (error) {
       if (error.response) {
         setApiError(
@@ -262,4 +254,4 @@ const OtpVerification = () => {
   );
 };
 
-export default OtpVerification;
+export default ForgetOtpVerification;

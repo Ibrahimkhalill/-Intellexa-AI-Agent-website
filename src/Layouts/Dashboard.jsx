@@ -12,11 +12,13 @@ import {
 } from "react-icons/ri";
 import { SiBilibili } from "react-icons/si";
 import { HiOutlineBookmarkSquare } from "react-icons/hi2";
-
+import { useAuth } from "../components/authContext";
 
 const Dashboard = () => {
   const [open, setOpen] = useState(true);
   const location = useLocation();
+  const { logout } = useAuth();
+
   const handleLogout = () => {
     Swal.fire({
       title: "Are you sure?",
@@ -27,6 +29,7 @@ const Dashboard = () => {
       cancelButtonText: "No, Cancel!",
     }).then((result) => {
       if (result.isConfirmed) {
+        logout();
         console.log("User logged out");
       }
     });
@@ -34,11 +37,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 768) {
-        setOpen(false);
-      } else {
-        setOpen(true);
-      }
+      setOpen(window.innerWidth >= 768);
     };
     handleResize();
     window.addEventListener("resize", handleResize);
@@ -86,16 +85,16 @@ const Dashboard = () => {
   ];
 
   const studentMenus = Menus.filter((menu) => menu.role === "user");
+
   return (
     <div className="flex">
       {/* Sidebar */}
       <div
-        className={` ${
-          open ? "w-52 p-4" : "w-14 text-center"
-        } h-screen bg-base-300 fixed left-0 top-0 bottom-0 z-50 pt-8 transition-all duration-500`}
-      >
+        className={`${
+          open ? "!w-52 !p-4" : "!w-14 !text-center"
+        } !h-screen !bg-base-300 fixed left-0 top-0 bottom-0 z-50 !pt-8 transition-all duration-500`}>
         <RiArrowRightSLine
-          className={`absolute cursor-pointer -right-5 text-gray-400 bg-base-300 shadow-2xl top-9 w-10 h-10 rounded-full ${
+          className={`absolute cursor-pointer -right-5 !text-gray-400 !bg-base-300 shadow-2xl top-9 w-10 h-10 rounded-full ${
             !open && "rotate-180"
           }`}
           onClick={() => setOpen(!open)}
@@ -104,15 +103,14 @@ const Dashboard = () => {
           <img
             src="/your-logo.png"
             alt="logo"
-            className={`cursor-pointer w-full md:w-9/12 p-1 duration-500`}
+            className="cursor-pointer w-full md:w-9/12 p-1 duration-500"
           />
         </div>
 
         <ul
           className={`${
             open ? "" : "flex flex-col items-center justify-center"
-          }`}
-        >
+          }`}>
           {studentMenus.map((Menu, index) => (
             <Link
               to={Menu.path}
@@ -121,17 +119,15 @@ const Dashboard = () => {
                 Menu.gap ? "mt-9" : "mt-2"
               } ${
                 location.pathname === Menu.path
-                  ? "bg-[#1E2839] text-white"
-                  : "hover:bg-white"
-              }`} // Add active class
-            >
-              <li className="flex items-center gap-x-2 text-md ">
+                  ? "!bg-[#1E2839] !text-white"
+                  : "hover:!bg-white"
+              }`}>
+              <li className="flex items-center gap-x-2 text-md">
                 <IconContext.Provider value={{ className: "react-icon" }}>
                   <Menu.icon className="text-lg" />
                 </IconContext.Provider>
                 <span
-                  className={`${!open && "hidden"} origin-left duration-200`}
-                >
+                  className={`${!open && "hidden"} origin-left duration-200`}>
                   {Menu.title}
                 </span>
               </li>
@@ -144,9 +140,8 @@ const Dashboard = () => {
           <Link
             to="/profile"
             className={`-ml-3.5 flex p-2 pl-6 cursor-pointer text-sm items-center w-full ${
-              location.pathname === "/profile" ? "bg-white" : "hover:bg-white"
-            }`}
-          >
+              location.pathname === "/profile" ? "!bg-white" : "hover:!bg-white"
+            }`}>
             <li className="flex items-center gap-x-4 w-full">
               <RiMapPinUserLine className="text-xl" />
               <span className={`${!open && "hidden"} origin-left duration-200`}>
@@ -156,10 +151,9 @@ const Dashboard = () => {
           </Link>
           <button
             onClick={handleLogout}
-            className="flex text-red-400 p-2 text-sm items-center cursor-pointer w-full"
-          >
+            className="flex !text-red-400 p-2 text-sm items-center cursor-pointer w-full">
             <li className="flex items-center gap-x-4 w-full">
-              <RiLogoutBoxRLine className="text-xl"/>
+              <RiLogoutBoxRLine className="text-xl" />
               <span className={`${!open && "hidden"} origin-left duration-200`}>
                 Logout
               </span>
@@ -170,10 +164,9 @@ const Dashboard = () => {
 
       {/* Main Content Area */}
       <div
-        className={` ${
-          open ? "pl-52" : "pl-14 pr-2"
-        } flex-1 overflow-y-auto transition-all duration-500 h-[100vh] `}
-      >
+        className={`${
+          open ? "!pl-52" : "!pl-14 !pr-2"
+        } flex-1 overflow-y-auto transition-all duration-500 h-[100vh]`}>
         <Outlet />
       </div>
     </div>

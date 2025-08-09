@@ -1,33 +1,47 @@
 import { useForm } from "react-hook-form";
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { FaEnvelope } from "react-icons/fa";
 import logo from "../../assets/logo/logo.png";
+import axiosInstance from "../../components/axiosinstance";
 
-const ForgetEmail = () => {
+const ForgetEmail = ({ onSuccess }) => {
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm();
-  const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [apiError, setApiError] = useState(null);
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);
+    setApiError(null);
     try {
-      console.log("Form Data:", data);
-      // Simulate API call to send OTP
-      // Replace with your actual API call, e.g.:
-      // await api.sendOtp(data.email);
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Mock delay
-      // Store email in localStorage or pass via state for OTP verification
-      localStorage.setItem("resetEmail", data.email);
+      const response = await axiosInstance.post(
+        "api/auth/password-reset-otp/",
+        {
+          email: data.email,
+        }
+      );
+      console.log("OTP sent successfully:", response.data);
+      // Store user_id or email for OTP verification
+      const userId = response.data.user_id; // Adjust based on actual API response
+
+      if (userId) {
+        localStorage.setItem("user_id", userId);
+      }
       // Navigate to OTP verification page
-      navigate("/otp");
+
+      onSuccess(userId);
     } catch (error) {
-      console.error("Error sending OTP:", error);
-      // Handle error (e.g., show error message to user)
-      alert("Failed to send OTP. Please try again.");
+      if (error.response) {
+        setApiError(
+          error.response.data.message || "Failed to send OTP. Please try again."
+        );
+      } else {
+        setApiError("Network error. Please check your connection.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -36,16 +50,17 @@ const ForgetEmail = () => {
   return (
     <div className="grid grid-cols-7 min-h-screen bg-base-200">
       {/* Left Side */}
-      <div className="col-span-3 bg-[#F5F4F0] flex items-center p-8">
-        <div className="absolute top-10">
-          <img src={logo} alt="Logo" />
+      <div className="col-span-3 bg-[#F5F4F0] flex items-center p-8 relative">
+        <div className="absolute top-4 left-4">
+          <img src={logo} alt="Logo" className="w-24 h-auto" />
         </div>
         <div>
           <h2 className="text-black text-4xl font-bold leading-tight">
             Reset Your Password
           </h2>
           <p className="text-[#A1A1A1] text-sm mt-3">
-            Enter your email to receive a 6-digit OTP and regain access to your AI workspace.
+            Enter your email to receive a 6-digit OTP and regain access to your
+            AI workspace.
           </p>
         </div>
       </div>
@@ -58,13 +73,18 @@ const ForgetEmail = () => {
           </h2>
           <p className="text-center text-sm mb-6">
             Remember your account?{" "}
-            <Link to="/login" className="text-blue-500 hover:underline">
+            <Link to="/signin" className="text-blue-500 hover:underline">
               Sign In
             </Link>
           </p>
 
           {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {apiError && (
+              <p className="text-red-500 text-sm text-center mb-4">
+                {apiError}
+              </p>
+            )}
             <div>
               <label className="block text-sm font-medium mb-1">
                 Email Address
@@ -82,6 +102,7 @@ const ForgetEmail = () => {
                   placeholder="Enter your email address"
                   className="w-full border border-base-300 bg-base-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <FaEnvelope className="absolute inset-y-3 right-3 flex items-center text-gray-500" />
               </div>
               {errors.email && (
                 <p className="text-red-500 text-sm mt-1">
@@ -94,9 +115,10 @@ const ForgetEmail = () => {
               type="submit"
               disabled={isSubmitting}
               className={`w-full bg-black text-white font-semibold py-2 rounded-md ${
-                isSubmitting ? "opacity-50 cursor-not-allowed" : "hover:bg-slate-600 cursor-pointer"
-              }`}
-            >
+                isSubmitting
+                  ? "opacity-50 cursor-not-allowed"
+                  : "hover:bg-slate-600 cursor-pointer"
+              }`}>
               {isSubmitting ? "Sending..." : "Send OTP"}
             </button>
           </form>
