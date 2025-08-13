@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Mail, Search, Settings, Plus, LogIn } from "lucide-react";
 import { useGoogleLogin } from "@react-oauth/google";
 import axios from "axios";
+import { Bot } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 const EmailAutomation = () => {
   const [accessToken, setAccessToken] = useState(null);
@@ -17,14 +19,13 @@ const EmailAutomation = () => {
   const [pageTokens, setPageTokens] = useState([""]);
   const [searchQuery, setSearchQuery] = useState("");
   const [conversation, setConversation] = useState({}); // { emailId: [{ type: "user" | "ai", message, timestamp }] }
-
+  const [isTyping, setIsTyping] = useState(false);
   const tags = ["Booking", "Finding", "Inquiries"];
 
   // Google OAuth login
   const login = useGoogleLogin({
     scope: "https://www.googleapis.com/auth/gmail.readonly",
     onSuccess: async (tokenResponse) => {
-      console.log("Google Login Success:", tokenResponse);
       const token = tokenResponse.access_token;
       setAccessToken(token);
       localStorage.setItem("gmail_access_token", token);
@@ -125,22 +126,26 @@ const EmailAutomation = () => {
         const htmlPart = payload.parts.find(
           (part) => part.mimeType === "text/html"
         );
-        if (htmlPart) {
+        if (htmlPart && htmlPart.body && htmlPart.body.data) {
           body = atob(htmlPart.body.data.replace(/-/g, "+").replace(/_/g, "/"));
-        } else if (textPart) {
+        } else if (textPart && textPart.body && textPart.body.data) {
           body = atob(textPart.body.data.replace(/-/g, "+").replace(/_/g, "/"));
         }
       } else if (
         payload.mimeType === "text/plain" ||
         payload.mimeType === "text/html"
       ) {
-        body = atob(payload.body.data.replace(/-/g, "+").replace(/_/g, "/"));
+        if (payload.body && payload.body.data) {
+          body = atob(payload.body.data.replace(/-/g, "+").replace(/_/g, "/"));
+        }
       }
 
       setEmailBody(body);
     } catch (err) {
       console.error("Email body fetch failed:", err);
-
+      localStorage.removeItem("gmail_access_token");
+      setAccessToken(null);
+      window.location.reload();
       setBodyError(
         err.response?.data?.error?.message || "Failed to fetch email body."
       );
@@ -148,14 +153,13 @@ const EmailAutomation = () => {
     setBodyLoading(false);
   };
 
-  // Send message to AI and get response
   const sendToAI = async () => {
     if (!message.trim() || !selectedEmail || !accessToken) return;
-
-    const userMessage = message;
+    setIsTyping(true);
+    const userMessage = message.trim();
     const timestamp = new Date().toISOString();
 
-    // Add user message to conversation
+    // Add user message to conversation immediately
     setConversation((prev) => ({
       ...prev,
       [selectedEmail]: [
@@ -164,33 +168,79 @@ const EmailAutomation = () => {
       ],
     }));
 
-    setMessage(""); // Clear input
+    setMessage(""); // clear input
     setBodyError(null);
 
-    // try {
-    //   const response = await axiosInstance.post("/api/ai/respond", {
-    //     message: userMessage,
-    //     context: emailBody, // Send email body as context
-    //   });
+    try {
+      const previousMessages = conversation[selectedEmail] || [];
 
-    //   const aiResponse = response.data.response || "No response from AI.";
+      // Convert HTML email body to plain text before sending
+      function htmlToPlainText(html) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+        doc
+          .querySelectorAll("style, script, noscript")
+          .forEach((el) => el.remove());
+        const text = doc.body.textContent || "";
+        return text.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, "").trim();
+      }
 
-    //   // Add AI response to conversation
-    //   setConversation((prev) => ({
-    //     ...prev,
-    //     [selectedEmail]: [
-    //       ...(prev[selectedEmail] || []),
-    //       {
-    //         type: "ai",
-    //         message: aiResponse,
-    //         timestamp: new Date().toISOString(),
-    //       },
-    //     ],
-    //   }));
-    // } catch (err) {
-    //   console.error("AI request failed:", err);
-    //   setBodyError(err.response?.data?.message || "Failed to get AI response.");
-    // }
+      const plainTextEmailBody = htmlToPlainText(emailBody);
+
+      console.log("plainTextEmailBody", plainTextEmailBody);
+
+      // Prepare parts for Gemini API: email body context, previous messages, current user message
+      const parts = [
+        { text: `Context: ${plainTextEmailBody}` },
+        ...previousMessages.flatMap((msg) => [{ text: msg.message }]),
+        { text: userMessage },
+      ];
+
+      const res = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-goog-api-key": "AIzaSyDOKxgkMnQ7WDzBuIXPMlndzfO3TjJ2ugU",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: parts,
+              },
+            ],
+          }),
+        }
+      );
+
+      if (!res.ok) throw new Error("Failed to fetch Gemini API");
+
+      const data = await res.json();
+
+      const aiResponseObject = data?.candidates?.[0]?.content;
+      const aiResponseText =
+        aiResponseObject?.parts?.map((part) => part.text).join(" ") ||
+        "No response";
+
+      // Add AI response to conversation
+      setConversation((prev) => ({
+        ...prev,
+        [selectedEmail]: [
+          ...(prev[selectedEmail] || []),
+          {
+            type: "ai",
+            message: aiResponseText,
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      }));
+      setIsTyping(false);
+    } catch (err) {
+      console.error("AI request failed:", err);
+      setBodyError(err.message || "Failed to get AI response.");
+      setIsTyping(false);
+    }
   };
 
   // Debounced search
@@ -357,55 +407,70 @@ const EmailAutomation = () => {
             {/* Chat Header */}
             <div className="p-6 border-b border-gray-200 bg-white">
               <h3 className="text-lg font-semibold text-gray-900">
-                {/* {emails.find((e) => e.id === selectedEmail)?.sender} -{" "} */}
                 {emails.find((e) => e.id === selectedEmail)?.subject}
               </h3>
             </div>
 
-            {/* Chat Content */}
-            <div className="flex-1 p-6 bg-gray-50 overflow-auto max-h-[70vh] overflow-y-auto">
-              {bodyLoading ? (
-                <div className="text-center text-gray-500">
-                  Loading email...
-                </div>
-              ) : bodyError ? (
-                <div className="text-center text-red-500">{bodyError}</div>
-              ) : emailBody ? (
-                <div className="space-y-4">
-                  <iframe
-                    srcDoc={emailBody}
-                    sandbox=""
-                    style={{ width: "100%", height: "600px", border: "none" }}
-                  />
-                  {/* Conversation Messages */}
-                  {(conversation[selectedEmail] || []).map((msg, index) => (
+            {/* Chat Content - single scroll container */}
+            <div
+              className="flex flex-col overflow-y-auto  space-y-4 p-6 bg-gray-50"
+              style={{ height: "600px" }}>
+              <iframe
+                srcDoc={emailBody}
+                sandbox=""
+                style={{ width: "100%", height: "100%", border: "none" }}
+              />
+              <div className="flex flex-col space-y-4">
+                {(conversation[selectedEmail] || []).map((msg, index) => (
+                  <div
+                    key={index}
+                    className={`flex ${
+                      msg.type === "user" ? "justify-end" : "justify-start"
+                    }`}>
                     <div
-                      key={index}
-                      className={`flex ${
-                        msg.type === "user" ? "justify-end" : "justify-start"
-                      } mt-2`}>
-                      <div
-                        className={`p-3 rounded-lg max-w-xs border ${
-                          msg.type === "user"
-                            ? "bg-green-100 text-gray-900 border-green-200"
-                            : "bg-gray-100 text-gray-900 border-gray-200"
-                        }`}>
-                        <p className="text-sm">{msg.message}</p>
-                        <p className="text-xs text-gray-500 mt-1 text-right">
-                          {new Date(msg.timestamp).toLocaleString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
+                      className={`p-4 rounded-2xl max-w-xl shadow-sm ${
+                        msg.type === "user"
+                          ? "bg-green-100  self-end rounded-br-none"
+                          : "bg-gray-200 text-gray-900 self-start rounded-bl-none"
+                      }`}>
+                      <ReactMarkdown>{msg.message}</ReactMarkdown>
+                      <p className="text-xs  mt-1 text-right select-none">
+                        {new Date(msg.timestamp).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Typing Indicator */}
+                {isTyping && (
+                  <div className="flex justify-start animate-fade-in mt-2">
+                    <div className="flex max-w-4xl">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-100 mr-4 flex items-center justify-center shadow-lg">
+                        <Bot className="w-5 h-5 text-black" />
+                      </div>
+                      <div className="px-6 py-4 rounded-2xl bg-gray-100 border border-gray-700/50 backdrop-blur-sm">
+                        <div className="flex items-center space-x-2">
+                          <div className="flex space-x-1">
+                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                            <div
+                              className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"
+                              style={{ animationDelay: "0.1s" }}></div>
+                            <div
+                              className="w-2 h-2 bg-teal-400 rounded-full animate-bounce"
+                              style={{ animationDelay: "0.2s" }}></div>
+                          </div>
+                          <span className="text-gray-400 text-sm">
+                            AI is thinking...
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center text-gray-500">
-                  <p>Unable to display email content.</p>
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Chat Input */}
@@ -417,19 +482,25 @@ const EmailAutomation = () => {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   className="flex-1 px-4 py-3 outline-none rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      sendToAI();
+                    }
+                  }}
                 />
               </div>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center space-x-2 flex-wrap">
-                  <div className="bg-[#E2F4EC] p-2 rounded-full">
+                  {/* <div className="bg-[#E2F4EC] p-2 rounded-full">
                     <Plus className="w-5 h-5 text-gray-400" />
-                  </div>
+                  </div> */}
                   {tags.map((tag) => (
-                    <span
+                    <button
+                      onClick={() => setMessage(tag)}
                       key={tag}
                       className="px-3 py-2 bg-gray-100 text-gray-900 rounded-full text-sm cursor-pointer hover:bg-gray-200">
                       {tag}
-                    </span>
+                    </button>
                   ))}
                 </div>
                 <button
@@ -438,19 +509,14 @@ const EmailAutomation = () => {
                   Send
                 </button>
               </div>
+              {bodyError && (
+                <p className="mt-2 text-red-600 text-sm">{bodyError}</p>
+              )}
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center bg-gray-50">
-            <div className="w-20 h-20 bg-gray-200 rounded-2xl flex items-center justify-center mb-6">
-              <Mail className="w-10 h-10 text-gray-400" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              Select an email
-            </h3>
-            <p className="text-gray-500 text-center max-w-sm">
-              Choose an email to read its content
-            </p>
+          <div className="flex items-center justify-center flex-grow text-gray-400 text-lg font-medium">
+            Please select an email from the left.
           </div>
         )}
       </div>

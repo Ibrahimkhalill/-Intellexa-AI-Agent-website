@@ -25,9 +25,12 @@ const refreshAccessToken = async () => {
       throw new Error("No refresh token found");
     }
 
-    const response = await axios.post("http://127.0.0.1:8000/auth/refresh/", {
-      refresh_token: refreshToken,
-    });
+    const response = await axios.post(
+      "http://127.0.0.1:8000/api/auth/refresh/",
+      {
+        refresh_token: refreshToken,
+      }
+    );
 
     const { access_token } = response.data;
 
