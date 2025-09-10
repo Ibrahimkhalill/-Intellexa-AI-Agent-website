@@ -13,11 +13,18 @@ import {
 import { SiBilibili } from "react-icons/si";
 import { HiOutlineBookmarkSquare } from "react-icons/hi2";
 import { useAuth } from "../components/authContext";
+import saveToken from "../components/saveToken";
 
 const Dashboard = () => {
   const [open, setOpen] = useState(true);
   const location = useLocation();
-  const { logout } = useAuth();
+  const { logout, isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      saveToken(); // call this once when Dashboard mounts
+    }
+  }, [isAuthenticated]);
 
   const handleLogout = () => {
     Swal.fire({

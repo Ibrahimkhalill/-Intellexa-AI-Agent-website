@@ -384,7 +384,7 @@ export default function ProfilePage() {
             <button
               onClick={handleCheckout}
               disabled={isLoading || isSubscribed}
-              className={`w-full text-white font-semibold py-3 rounded-lg transition 
+              className={`w-full cursor-pointer text-white font-semibold py-3 rounded-lg transition 
     ${
       isLoading || isSubscribed
         ? "bg-slate-400 cursor-not-allowed"

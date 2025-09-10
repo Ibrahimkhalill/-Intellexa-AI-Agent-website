@@ -73,36 +73,6 @@ const NoirChat = () => {
     }
   };
 
-  // // AI response simulation function (you can keep your existing one)
-  // const getAIResponse = (userMessage) => {
-  //   const responses = [
-  //     "I understand you're looking for help with that. Let me provide some insights based on your question.",
-  //     "That's an interesting perspective. Here's what I think about your inquiry.",
-  //     "I can help you with that. Let me break down the key points for you.",
-  //     "Thank you for your question. Based on what you've shared, here are some thoughts.",
-  //     "I appreciate you reaching out. Let me provide a thoughtful response to your query.",
-  //     "That's a great question. Here's my analysis of the situation you've described.",
-  //     "I'm here to help. Let me offer some guidance on what you've asked about.",
-  //     "Your question touches on some important points. Here's my perspective on the matter.",
-  //   ];
-
-  //   const lowerMessage = userMessage.toLowerCase();
-  //   if (lowerMessage.includes("hello") || lowerMessage.includes("hi")) {
-  //     return "👋 Hello! I'm here to help you with any questions or tasks you might have. What would you like to explore today?";
-  //   }
-  //   if (lowerMessage.includes("help")) {
-  //     return "🤝 I'm here to assist you! I can help with a wide range of topics including answering questions, providing explanations, helping with analysis, creative writing, coding, and much more. What specifically would you like help with?";
-  //   }
-  //   if (lowerMessage.includes("weather")) {
-  //     return "🌤️ I don't have access to real-time weather data, but I'd be happy to help you find weather information or discuss weather-related topics. What would you like to know?";
-  //   }
-  //   if (lowerMessage.includes("code") || lowerMessage.includes("programming")) {
-  //     return "💻 I'd be happy to help with coding! I can assist with various programming languages, debug code, explain concepts, or help you build applications. What programming challenge are you working on?";
-  //   }
-
-  //   return responses[Math.floor(Math.random() * responses.length)];
-  // };
-
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!inputValue.trim()) return;

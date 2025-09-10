@@ -1,54 +1,27 @@
 import { ChevronRight } from "lucide-react";
 import AutomationAiSupport from "../Worlflow/AutomationAiSupport";
+import axiosInstance from "../../../components/axiosinstance";
+import { useEffect, useState } from "react";
 
 const HomePage = () => {
-  const workflowData = [
-    {
-      id: 1,
-      created: "04/15/2024",
-      booking: "Email Automation",
-      bookingDate: "Sep 15-22, 2025",
-      guests: 3,
-      status: "Processing",
-    },
-    {
-      id: 2,
-      created: "04/15/2024",
-      booking: "Hotel Reservation",
-      bookingDate: "Jul 22-28, 2025",
-      guests: 5,
-      status: "Processing",
-    },
-    {
-      id: 3,
-      created: "04/15/2024",
-      booking: "Email Automation",
-      bookingDate: "Aug 12-15, 2025",
-      guests: 12,
-      status: "Cancel",
-    },
-    {
-      id: 4,
-      created: "04/15/2024",
-      booking: "Spa Booking",
-      bookingDate: "Sep 17-23, 2025",
-      guests: 8,
-      status: "Confirm",
-    },
-  ];
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "Processing":
-        return "text-yellow-600 bg-yellow-50";
-      case "Cancel":
-        return "text-red-600 bg-red-50";
-      case "Confirm":
-        return "text-green-600 bg-green-50";
-      default:
-        return "text-gray-600 bg-gray-50";
-    }
-  };
+  useEffect(() => {
+    const fetchBookings = async () => {
+      setLoading(true);
+
+      try {
+        const response = await axiosInstance.get("api/booking/list/");
+        setBookings(response.data || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchBookings();
+  }, []);
 
   // const automationTemplates = [
   //   {
@@ -102,103 +75,74 @@ const HomePage = () => {
   //     icons: [hotelImg, aiImg, res],
   //   },
   // ];
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      month: "2-digit",
+      day: "2-digit",
+      year: "numeric",
+    });
+  };
 
+  // Format booking date range (assuming single date for now)
+  const formatBookingDate = (dateString) => {
+    const date = new Date(dateString);
+    const startDate = date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+    });
+    // Assuming a single date; adjust if API provides a range
+    return `${startDate}`;
+  };
   return (
-    <div className="min-h-screen  flex">
+    <div className=" flex">
       {/* Main Content */}
       <div className="flex-1 p-8">
         <div className=" mb-8">
-            <div className="bg-gradient-to-r from-[#fffcf5] to-white rounded-lg border border-gray-50 p-4 overflow-hidden shadow-sm">
-                <div className="flex items-center justify-between mb-6">
+          <div className="bg-gradient-to-r from-[#fffcf5] to-white rounded-lg border border-gray-50 p-4 overflow-hidden shadow-sm">
+            <div className="flex items-center justify-between mb-6">
               <h1 className="text-2xl font-semibold text-gray-900">
                 Workflow Overview
               </h1>
               <ChevronRight className="w-6 h-6 text-gray-400" />
             </div>
-              <table className="w-full">
-                <thead className="bg-blue-50">
-                  <tr className=" text-left text-sm font-medium text-gray-900">
-                    <th className="px-6 py-4">
-                      Created
-                    </th>
-                    <th className="px-6 py-4">
-                      Booking
-                    </th>
-                    <th className="px-6 py-4">
-                      Booking date
-                    </th>
-                    <th className="px-6 py-4">
-                      Guests
-                    </th>
-                    <th className="px-6 py-4">
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {workflowData.map((row) => (
-                    <tr key={row.id} className="hover:bg-gray-50">
+            <table className="w-full">
+              <thead className="bg-blue-50">
+                <tr className=" text-left text-sm font-medium text-gray-900">
+                  <th className="px-6 py-4">Created</th>
+                  <th className="px-6 py-4">Booking Type</th>
+                  <th className="px-6 py-4">Location</th>
+                  <th className="px-6 py-4">Booking Start Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {bookings.length > 0 &&
+                  bookings.slice(0, 5).map((booking) => (
+                    <tr key={booking.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {row.created}
+                        {formatDate(booking.created_at)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {row.booking}
+                        {booking.booking_type.charAt(0).toUpperCase() +
+                          booking.booking_type.slice(1)}{" "}
+                        Booking
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {row.bookingDate}
+                        {booking.location}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {row.guests} Guest{row.guests !== 1 ? "s" : ""}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                            row.status
-                          )}`}
-                        >
-                          {row.status}
-                        </span>
+                        {formatBookingDate(booking.booking_datetime)}
                       </td>
                     </tr>
                   ))}
-                </tbody>
-              </table>
-            </div>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Automation Templates Grid */}
-        <AutomationAiSupport/>
-        {/* <div className="grid grid-cols-4 gap-6">
-          {automationTemplates.map((template, index) => (
-            <div
-              key={index}
-              className="bg-[#F5F4F0] rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer"
-            >
-              <div className="flex items-center justify-center space-x-2 mb-4">
-                {template.icons.map((image, iconIndex) => (
-                  <React.Fragment key={iconIndex}>
-                    <div className="w-14 h-14 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <img
-                        src={image}
-                        alt={`${template.title} icon ${iconIndex + 1}`}
-                        className="w-14 h-14 object-contain"
-                      />
-                    </div>
-                    {iconIndex < template.icons.length - 1 && (
-                      <ArrowRight className="w-5 h-5 text-gray-400" />
-                    )}
-                  </React.Fragment>
-                ))}
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">
-                {template.title}
-              </h3>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                {template.description}
-              </p>
-            </div>
-          ))}
-        </div> */}
+        <AutomationAiSupport />
       </div>
     </div>
   );

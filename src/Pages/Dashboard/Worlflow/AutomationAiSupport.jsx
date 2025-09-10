@@ -54,21 +54,12 @@ const AutomationAiSupport = () => {
       icons: [concertImg, aiImg, documentImg],
       link: "/ai_search",
     },
-
-    {
-      title: "Spa Booking",
-      description:
-        "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-      icons: [spaImg, aiImg, BookNow],
-      link: "/ai_search",
-    },
-
     {
       title: "Email Automation",
       description:
         "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
       icons: [emailImg, aiImg, emailImg],
-      link: "/email-automation",
+      link: "/email",
     },
     {
       title: "Hotel Reservation",
@@ -80,17 +71,19 @@ const AutomationAiSupport = () => {
   ];
 
   return (
-    <div className="min-h-screen flex">
-      {/* Main Content */}
+    <div className="flex">
       <div className="flex-1">
-        {/* Automation Templates Grid */}
         <div className="grid grid-cols-4 gap-6">
           {automationTemplates.map((template, index) => (
             <div
               key={index}
-              onClick={() => template.link && navigate(template.link)}
-              className="bg-[#F5F4F0] rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer"
-            >
+              onClick={() =>
+                template.link &&
+                navigate(
+                  `${template.link}/${encodeURIComponent(template.title)}`
+                )
+              }
+              className="bg-[#F5F4F0] rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer">
               <div className="flex items-center justify-center space-x-2 mb-4">
                 {template.icons.map((image, iconIndex) => (
                   <React.Fragment key={iconIndex}>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Mail, Search, Settings, Plus, LogIn } from "lucide-react";
+import { Mail, Search, Settings, LogIn } from "lucide-react";
 import { useGoogleLogin } from "@react-oauth/google";
 import axios from "axios";
 import { Bot } from "lucide-react";

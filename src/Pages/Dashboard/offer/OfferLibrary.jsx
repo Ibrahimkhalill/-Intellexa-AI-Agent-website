@@ -1,123 +1,143 @@
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import axios from "axios";
 
 const OfferLibrary = () => {
-  
+  const [offers, setOffers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const hotelOffers = [
-    {
-      id: 1,
-      image: 'https://media.istockphoto.com/id/104731717/photo/luxury-resort.jpg?s=612x612&w=0&k=20&c=cODMSPbYyrn1FHake1xYz9M8r15iOfGz9Aosy9Db7mI=',
-      title: 'Stay in Luxury: Book 5-Star Comfort at Unbeatable Prices!',
-      description: 'Relax in premium suites, enjoy rooftop pools, spa services, and world-class dining. Reserve now for exclusive discounts!',
-      imageAlt: 'Luxury hotel room with modern amenities'
-    },
-    {
-      id: 2,
-      image: 'https://www.usatoday.com/gcdn/-mm-/05b227ad5b8ad4e9dcb53af4f31d7fbdb7fa901b/c=0-64-2119-1259/local/-/media/USATODAY/USATODAY/2014/08/13/1407953244000-177513283.jpg',
-      title: 'Your Perfect City Escape — Rooms Starting at $49!',
-      description: 'Find cozy stays or luxury hotels within your budget. Book now & get free breakfast + Wi-Fi! Limited-time offer.',
-      imageAlt: 'Modern city hotel room'
-    },
-    {
-      id: 3,
-      image: 'https://blupp.b-cdn.net/eroshotel/bbd0e739-682a-4e30-a1b0-aea296169f28/home-slider-2.jpg?quality=80',
-      title: 'Last-Minute Hotel Deals Near You — Save Big Today!',
-      description: 'Stay near top attractions and nightlife. Comfortable rooms, great service — everything you need for a perfect stay.',
-      imageAlt: 'Hotel exterior with pool'
-    }
-  ];
+  // Fetch offers from the API
+  useEffect(() => {
+    const fetchOffers = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await axios.get(
+          "https://wbsl64n9-8005.inc1.devtunnels.ms/offers-api/offers"
+        );
+        // Generate shortId for each offer
+        const enhancedOffers = response.data.offers.map((offer, index) => ({
+          ...offer,
+          shortId: offer.id.split("/").pop() || `offer-${index}`, // Extract last segment of URL or use index
+        }));
+        setOffers(enhancedOffers || []);
+      } catch (err) {
+        setError("Failed to fetch offers. Please try again.");
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOffers();
+  }, []);
 
-  const restaurantOffers = [
-    {
-      id: 1,
-      image: 'https://plus.unsplash.com/premium_photo-1661883237884-263e8de8869b?fm=jpg&q=60&w=3000&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NXx8cmVzdGF1cmFudHxlbnwwfHwwfHx8MA%3D%3D',
-      title: 'Taste the Best — Fresh Flavors Delivered to Your Table!',
-      description: 'Indulge in delicious meals crafted by expert chefs. From farm-fresh ingredients to international delights — satisfaction guaranteed.',
-      imageAlt: 'Fine dining experience with wine'
-    },
-    {
-      id: 2,
-      image: 'https://lesroches.edu/wp-content/uploads/2022/08/Restaurant_business_plan_main.jpg',
-      title: 'Dine Like Never Before — Book Your Table Now!',
-      description: 'Reserve your spot at the city\'s top-rated restaurant. Family-friendly, vegan options, and irresistible desserts!',
-      imageAlt: 'People dining at restaurant'
-    },
-    {
-      id: 3,
-      image: 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/2b/56/71/59/atmosphere.jpg?w=600&h=-1&s=1',
-      title: 'Savor Every Bite: Local Favorites & Chef Specials Await!',
-      description: 'Authentic taste, cozy ambiance, and a menu loved by locals. Try our signature dishes today!',
-      imageAlt: 'Chef preparing food in kitchen'
+  // Group offers by category
+  const groupedOffers = offers.reduce((acc, offer) => {
+    const category = offer.category || "Other";
+    if (!acc[category]) {
+      acc[category] = [];
     }
-  ];
+    acc[category].push(offer);
+    return acc;
+  }, {});
 
   const OfferCard = ({ offer }) => (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-      <div className="aspect-[16/10] bg-gray-200 relative overflow-hidden">
-        <img 
-          src={offer.image} 
-          alt={offer.imageAlt}
-          className="w-full h-full object-cover"
-        />
+    <Link to={`/booking/${offer.shortId}`} className="block">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow h-64 flex flex-col">
+        <div className=" bg-gray-200 relative overflow-hidden">
+          <img
+            src={
+              offer.image_url ||
+              "https://blupp.b-cdn.net/eroshotel/bbd0e739-682a-4e30-a1b0-aea296169f28/home-slider-2.jpg?quality=80"
+            }
+            alt={offer.imageAlt || "Offer image"}
+            className="w-full h-[50vh] object-cover"
+          />
+        </div>
+        <div className="p-4 flex flex-col flex-1">
+          <h3 className="font-semibold text-gray-900 mb-2 text-sm leading-tight line-clamp-2">
+            {offer.title}
+          </h3>
+          <p className="text-gray-600 text-xs leading-relaxed flex-1 line-clamp-3">
+            {offer.summary}
+          </p>
+          <p className="text-gray-500 font-medium text-xs mt-2">
+            Location: {offer.location}
+          </p>
+          {offer.url && (
+            <a
+              href={offer.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-700 text-sm mt-2 inline-block">
+              Visit Website
+            </a>
+          )}
+        </div>
       </div>
-      <div className="p-4">
-        <h3 className="font-semibold text-gray-900 mb-2 text-sm leading-tight">
-          {offer.title}
-        </h3>
-        <p className="text-gray-600 text-xs leading-relaxed">
-          {offer.description}
-        </p>
-      </div>
-    </div>
+    </Link>
   );
 
   return (
-    <div className="flex  bg-gray-50">
-      {/* Sidebar */}
-
-
+    <div className="flex bg-gray-50 min-h-screen">
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-8">
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-8">Offer Library</h2>
-            
-            {/* Hotel List Section */}
-            <div className="mb-12">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">Hotel List</h3>
-                <Link to={"/offer-libray/Hotel"} className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-                  See all
-                </Link>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {hotelOffers.map((offer) => (
-                  <Link key={offer.id} to={`/booking/${offer.id}`} className="block">
-                  <OfferCard offer={offer} />
-                  </Link>
-                ))}
-              </div>
-            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-8">
+              Offer Library
+            </h2>
 
-            {/* Restaurant List Section */}
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">Restaurant List</h3>
-                <Link to={"/offer-libray/Restaurant"} className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-                  See all
-                </Link>
+            {loading ? (
+              <div className="flex items-center h-[80vh] justify-center ">
+                <div className="flex flex-col items-center">
+                  <div className="w-12 h-12 border-4 border-t-blue-600 border-gray-200 rounded-full animate-spin"></div>
+                  <span className="text-gray-600 text-sm mt-4">
+                    Loading offers...
+                  </span>
+                </div>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {restaurantOffers.map((offer) => (
-                  <OfferCard key={offer.id} offer={offer} />
-                ))}
-              </div>
-            </div>
+            ) : error ? (
+              <p className="text-red-500 text-center">{error}</p>
+            ) : Object.keys(groupedOffers).length === 0 ? (
+              <p className="text-gray-600 text-center">No offers available.</p>
+            ) : (
+              Object.keys(groupedOffers).map((category) => (
+                <div key={category} className="mb-12">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {category.replace(/([A-Z])/g, " $1").trim()} Offers
+                    </h3>
+                    <Link
+                      to={`/offer-library/${category}`}
+                      className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+                      See all
+                    </Link>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {groupedOffers[category].map((offer) => (
+                      <OfferCard key={offer.id} offer={offer} />
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
+
+      {/* Custom Styles */}
+      <style>{`
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+      `}</style>
     </div>
   );
 };
