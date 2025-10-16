@@ -14,12 +14,12 @@ const OfferLibrary = () => {
       setError(null);
       try {
         const response = await axios.get(
-          "https://wbsl64n9-8005.inc1.devtunnels.ms/offers-api/offers"
+          `${import.meta.env.VITE_AI_BACKEND}/offers-api/offers`
         );
         // Generate shortId for each offer
         const enhancedOffers = response.data.offers.map((offer, index) => ({
           ...offer,
-          shortId: offer.id.split("/").pop() || `offer-${index}`, // Extract last segment of URL or use index
+          shortId: offer.id || `offer-${index}`,
         }));
         setOffers(enhancedOffers || []);
       } catch (err) {
@@ -42,55 +42,96 @@ const OfferLibrary = () => {
     return acc;
   }, {});
 
-  const OfferCard = ({ offer }) => (
-    <Link to={`/booking/${offer.shortId}`} className="block">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow h-64 flex flex-col">
-        <div className=" bg-gray-200 relative overflow-hidden">
-          <img
-            src={
-              offer.image_url ||
-              "https://blupp.b-cdn.net/eroshotel/bbd0e739-682a-4e30-a1b0-aea296169f28/home-slider-2.jpg?quality=80"
-            }
-            alt={offer.imageAlt || "Offer image"}
-            className="w-full h-[50vh] object-cover"
-          />
+  const OfferCard = ({ offer }) => {
+    const [showPopup, setShowPopup] = useState(false);
+
+    return (
+      <a href={offer.shortId} className="block group">
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden transform transition-all hover:scale-105 hover:shadow-lg h-96 flex flex-col">
+          <div className="relative h-60 overflow-hidden">
+            <img
+              src={
+                offer.image_url ||
+                "https://thumb.ac-illust.com/b1/b170870007dfa419295d949814474ab2_t.jpeg"
+              }
+              onError={(e) => {
+                e.target.onerror = null; // prevents infinite loop
+                e.target.src =
+                  "https://thumb.ac-illust.com/b1/b170870007dfa419295d949814474ab2_t.jpeg";
+              }}
+              alt={offer.imageAlt || "Offer image"}
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+            />
+
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+          </div>
+          <div className="p-5 flex flex-col flex-1">
+            <h3 className="font-bold text-lg text-gray-900 mb-3 line-clamp-2">
+              {offer.title}
+            </h3>
+            <p
+              className="text-gray-700 text-sm leading-relaxed flex-1 mb-3 cursor-pointer"
+              onClick={(e) => {
+                e.preventDefault();
+                setShowPopup(true);
+              }}>
+              {offer.summary.substring(0, 100)}...
+            </p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-gray-500 font-medium text-sm">
+                {offer.location}
+              </p>
+              {offer.offer_price && offer.currency && (
+                <p className="text-green-600 font-semibold text-sm">
+                  {offer.currency} {offer.offer_price}
+                </p>
+              )}
+            </div>
+            {offer.shortId && (
+              <a
+                href={offer.shortId}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 text-sm font-semibold transition-colors">
+                Explore Offer
+              </a>
+            )}
+          </div>
         </div>
-        <div className="p-4 flex flex-col flex-1">
-          <h3 className="font-semibold text-gray-900 mb-2 text-sm leading-tight line-clamp-2">
-            {offer.title}
-          </h3>
-          <p className="text-gray-600 text-xs leading-relaxed flex-1 line-clamp-3">
-            {offer.summary}
-          </p>
-          <p className="text-gray-500 font-medium text-xs mt-2">
-            Location: {offer.location}
-          </p>
-          {offer.url && (
-            <a
-              href={offer.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-700 text-sm mt-2 inline-block">
-              Visit Website
-            </a>
-          )}
-        </div>
-      </div>
-    </Link>
-  );
+
+        {showPopup && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg max-w-md">
+              <h3 className="font-bold text-lg text-gray-900 mb-3">
+                {offer.title}
+              </h3>
+              <p className="text-gray-700 text-sm leading-relaxed mb-3">
+                {offer.summary}
+              </p>
+              <button
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                onClick={() => setShowPopup(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </a>
+    );
+  };
 
   return (
     <div className="flex bg-gray-50 min-h-screen">
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="p-8">
+        <div className="p-8 max-w-8xl mx-auto">
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-8">
               Offer Library
             </h2>
 
             {loading ? (
-              <div className="flex items-center h-[80vh] justify-center ">
+              <div className="flex items-center h-[80vh] justify-center">
                 <div className="flex flex-col items-center">
                   <div className="w-12 h-12 border-4 border-t-blue-600 border-gray-200 rounded-full animate-spin"></div>
                   <span className="text-gray-600 text-sm mt-4">
@@ -99,23 +140,20 @@ const OfferLibrary = () => {
                 </div>
               </div>
             ) : error ? (
-              <p className="text-red-500 text-center">{error}</p>
+              <p className="text-red-500 text-center text-lg">{error}</p>
             ) : Object.keys(groupedOffers).length === 0 ? (
-              <p className="text-gray-600 text-center">No offers available.</p>
+              <p className="text-gray-600 text-center text-lg">
+                No offers available.
+              </p>
             ) : (
               Object.keys(groupedOffers).map((category) => (
                 <div key={category} className="mb-12">
                   <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3 className="text-xl font-semibold text-gray-900">
                       {category.replace(/([A-Z])/g, " $1").trim()} Offers
                     </h3>
-                    <Link
-                      to={`/offer-library/${category}`}
-                      className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-                      See all
-                    </Link>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {groupedOffers[category].map((offer) => (
                       <OfferCard key={offer.id} offer={offer} />
                     ))}

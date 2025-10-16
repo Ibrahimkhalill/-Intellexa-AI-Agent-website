@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import { User, Bot, Sparkles, Star, Zap } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { HiOutlineMicrophone } from "react-icons/hi";
-
 import { FaRegCircleStop } from "react-icons/fa6";
 
 const NoirChat = () => {
@@ -13,20 +12,40 @@ const NoirChat = () => {
   const [isRecording, setIsRecording] = useState(false);
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
+  const inputRef = useRef();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
+    if (inputRef.current) {
+      const input = inputRef.current;
+      input.focus();
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    // Load messages from sessionStorage on mount
+    const savedMessages = sessionStorage.getItem("chatHistory");
+    if (savedMessages) {
+      setMessages(JSON.parse(savedMessages));
+    }
     scrollToBottom();
+  }, []);
+
+  useEffect(() => {
+    // Save messages to sessionStorage whenever they change
+    if (messages.length > 0) {
+      sessionStorage.setItem("chatHistory", JSON.stringify(messages));
+      scrollToBottom();
+    }
   }, [messages]);
 
   useEffect(() => {
     if (
       !("webkitSpeechRecognition" in window || "SpeechRecognition" in window)
     ) {
-      // Browser doesn't support speech recognition
       console.warn("Speech Recognition not supported in this browser.");
       return;
     }
@@ -50,7 +69,6 @@ const NoirChat = () => {
 
     recognition.onend = () => {
       setIsRecording(false);
-      // Auto submit when speech ends (if inputValue has content)
       if (inputValue.trim()) {
         handleSubmit();
       }
@@ -80,18 +98,14 @@ const NoirChat = () => {
     const userMessage = inputValue.trim();
     setInputValue("");
 
-    // Add user message to local chat immediately
     setMessages((prev) => [...prev, { type: "user", content: userMessage }]);
 
     setIsTyping(true);
     setIsLoading(true);
 
     try {
-      // Prepare conversation history as parts array (alternating user/ai texts)
-      // Include all previous messages plus current user message
       const allMessages = [...messages, { type: "user", content: userMessage }];
 
-      // Map messages to parts, just text content in order
       const parts = allMessages.map((msg) => ({
         text: msg.content,
       }));
@@ -102,7 +116,7 @@ const NoirChat = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-goog-api-key": "AIzaSyDOKxgkMnQ7WDzBuIXPMlndzfO3TjJ2ugU",
+            "X-goog-api-key": import.meta.env.VITE_GEMNI_API_KEY,
           },
           body: JSON.stringify({
             contents: [
@@ -123,7 +137,11 @@ const NoirChat = () => {
         aiResponseObject?.parts?.map((part) => part.text).join(" ") ||
         "No response";
 
-      // Add AI response to chat
+      if (inputRef.current) {
+        const input = inputRef.current;
+        input.focus();
+      }
+
       setMessages((prev) => [...prev, { type: "ai", content: aiResponseText }]);
     } catch (error) {
       console.error(error);
@@ -156,14 +174,11 @@ const NoirChat = () => {
 
   return (
     <div className="flex h-screen bg-white overflow-hidden">
-      {/* Animated Background */}
       <div className="fixed bg-white"></div>
 
-      {/* Main Chat Area */}
       <div className="flex-1 flex flex-col relative">
         <FloatingParticles />
 
-        {/* Header */}
         <div className="bg-white px-6 py-4 relative border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -182,7 +197,6 @@ const NoirChat = () => {
           </div>
         </div>
 
-        {/* Chat Messages */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 relative">
           {messages.length === 0 ? (
             <div className="flex items-center justify-center h-full">
@@ -280,19 +294,18 @@ const NoirChat = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Area */}
         <div className="bg-white p-6 relative border-t border-gray-200">
           <div className="absolute inset-0 bg-wh"></div>
           <div className="flex items-center space-x-4 relative">
             <div className="flex-1 relative group">
               <input
                 type="text"
+                ref={inputRef}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleSubmit(e)}
                 placeholder="Ask anything... ✨"
                 className="w-full px-6 py-4 pr-14 bg-white rounded-2xl outline-none text-black border border-gray-300 shadow-md transition-all duration-300 placeholder-gray-400 text-sm"
-                disabled={isLoading}
               />
               <button
                 type="button"
@@ -311,15 +324,14 @@ const NoirChat = () => {
             <button
               onClick={handleSubmit}
               disabled={isLoading || !inputValue.trim()}
-              className="bg-teal-600 text-white px-8 py-4 rounded-2xl font-semibold transition-all duration-300 transform cursor-pointer flex items-center space-x-2">
-              <span>Explore</span>
+              className="bg-teal-600 text-white md:px-8 px-2 py-4 rounded-2xl font-semibold transition-all duration-300 transform cursor-pointer flex items-center space-x-2">
+              <span>Send</span>
               <Sparkles className="w-5 h-5" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Custom Styles */}
       <style>{`
         @keyframes fade-in {
           from {
@@ -336,7 +348,6 @@ const NoirChat = () => {
           animation: fade-in 0.5s ease-out;
         }
         
-        /* Custom scrollbar */
         ::-webkit-scrollbar {
           width: 8px;
         }

@@ -2,7 +2,7 @@ import axios from "axios";
 import Cookies from "js-cookie";
 
 const axiosInstance = axios.create({
-  baseURL: "http://127.0.0.1:8005/",
+  baseURL: import.meta.env.VITE_REACT_BASE_URL,
 });
 
 // Attach access token to headers
@@ -26,7 +26,7 @@ const refreshAccessToken = async () => {
     }
 
     const response = await axios.post(
-      "http://127.0.0.1:8005/api/auth/refresh/",
+      `${import.meta.env.VITE_REACT_BASE_URL}/api/auth/refresh/`,
       {
         refresh_token: refreshToken,
       }

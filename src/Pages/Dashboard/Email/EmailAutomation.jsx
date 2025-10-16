@@ -18,13 +18,13 @@ const EmailAutomation = () => {
   const [nextPageToken, setNextPageToken] = useState(null);
   const [pageTokens, setPageTokens] = useState([""]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [conversation, setConversation] = useState({}); // { emailId: [{ type: "user" | "ai", message, timestamp }] }
+  const [conversation, setConversation] = useState({});
   const [isTyping, setIsTyping] = useState(false);
   const tags = ["Booking", "Finding", "Inquiries"];
 
-  // Google OAuth login
   const login = useGoogleLogin({
-    scope: "https://www.googleapis.com/auth/gmail.readonly",
+    scope:
+      "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify",
     onSuccess: async (tokenResponse) => {
       const token = tokenResponse.access_token;
       setAccessToken(token);
@@ -37,11 +37,11 @@ const EmailAutomation = () => {
     },
   });
 
-  // Fetch email list
   const fetchEmails = async (token, pageToken = "", query = "") => {
     setLoading(true);
     setApiError(null);
     try {
+      console.log("Fetching emails with token:", token);
       const res = await axios.get(
         `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&pageToken=${pageToken}&q=${encodeURIComponent(
           query
@@ -50,8 +50,12 @@ const EmailAutomation = () => {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
+      console.log("API Response:", res.data);
 
       const messages = res.data.messages || [];
+      if (messages.length === 0) {
+        console.log("No emails found for query:", query);
+      }
       setNextPageToken(res.data.nextPageToken || null);
 
       const detailedEmails = await Promise.all(
@@ -62,7 +66,7 @@ const EmailAutomation = () => {
               headers: { Authorization: `Bearer ${token}` },
             }
           );
-          const headers = msgRes.data.payload.headers;
+          const headers = msgRes.data.payload.headers || [];
           const subject =
             headers.find((h) => h.name === "Subject")?.value || "(No Subject)";
           const from = headers.find((h) => h.name === "From")?.value || "";
@@ -90,21 +94,21 @@ const EmailAutomation = () => {
 
       setEmails(detailedEmails);
       if (detailedEmails.length > 0) setSelectedEmail(detailedEmails[0].id);
+      else setSelectedEmail(null);
     } catch (err) {
-      console.error("Email fetch failed:", err);
+      console.error("Email fetch failed:", err.response?.data || err);
       setApiError(
         err.response?.data?.error?.message || "Failed to fetch emails."
       );
-      if (err.response?.status === 401) {
+      if (err.response?.status === 401 || err.response?.status === 403) {
         localStorage.removeItem("gmail_access_token");
         setAccessToken(null);
-        window.location.reload();
+        setApiError("Please re-authenticate with Gmail.");
       }
     }
     setLoading(false);
   };
 
-  // Fetch email body
   const fetchEmailBody = async (emailId, token) => {
     setBodyLoading(true);
     setBodyError(null);
@@ -159,7 +163,6 @@ const EmailAutomation = () => {
     const userMessage = message.trim();
     const timestamp = new Date().toISOString();
 
-    // Add user message to conversation immediately
     setConversation((prev) => ({
       ...prev,
       [selectedEmail]: [
@@ -168,13 +171,12 @@ const EmailAutomation = () => {
       ],
     }));
 
-    setMessage(""); // clear input
+    setMessage("");
     setBodyError(null);
 
     try {
       const previousMessages = conversation[selectedEmail] || [];
 
-      // Convert HTML email body to plain text before sending
       function htmlToPlainText(html) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, "text/html");
@@ -189,7 +191,6 @@ const EmailAutomation = () => {
 
       console.log("plainTextEmailBody", plainTextEmailBody);
 
-      // Prepare parts for Gemini API: email body context, previous messages, current user message
       const parts = [
         { text: `Context: ${plainTextEmailBody}` },
         ...previousMessages.flatMap((msg) => [{ text: msg.message }]),
@@ -202,14 +203,11 @@ const EmailAutomation = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-goog-api-key": "AIzaSyDOKxgkMnQ7WDzBuIXPMlndzfO3TjJ2ugU",
+            "X-goog-api-key":
+              import.meta.env.VITE_GEMNI_API_KEY || "your_api_key_here",
           },
           body: JSON.stringify({
-            contents: [
-              {
-                parts: parts,
-              },
-            ],
+            contents: [{ parts }],
           }),
         }
       );
@@ -223,7 +221,6 @@ const EmailAutomation = () => {
         aiResponseObject?.parts?.map((part) => part.text).join(" ") ||
         "No response";
 
-      // Add AI response to conversation
       setConversation((prev) => ({
         ...prev,
         [selectedEmail]: [
@@ -243,7 +240,6 @@ const EmailAutomation = () => {
     }
   };
 
-  // Debounced search
   const debouncedFetchEmails = useCallback(() => {
     if (accessToken) {
       setPageTokens([""]);
@@ -259,18 +255,22 @@ const EmailAutomation = () => {
     return () => clearTimeout(handler);
   }, [searchQuery, debouncedFetchEmails]);
 
-  // Check for stored token on mount
   useEffect(() => {
     const token = localStorage.getItem("gmail_access_token");
     if (token) {
       setAccessToken(token);
-      fetchEmails(token);
+      fetchEmails(token).catch((err) => {
+        if (err.response?.status === 403 || err.response?.status === 401) {
+          localStorage.removeItem("gmail_access_token");
+          setAccessToken(null);
+          setApiError("Please re-authenticate with Gmail.");
+        }
+      });
     } else {
       setLoading(false);
     }
   }, []);
 
-  // Fetch email body when selectedEmail changes
   useEffect(() => {
     if (selectedEmail && accessToken) {
       fetchEmailBody(selectedEmail, accessToken);
@@ -284,16 +284,12 @@ const EmailAutomation = () => {
 
   return (
     <div className="min-h-screen bg-[#F2F4F3] flex flex-col md:flex-row p-4 md:p-10 overflow-hidden">
-      {/* Email List Sidebar */}
       <div className="w-full md:w-80 bg-white border-r border-gray-200 p-3 rounded-2xl md:rounded-l-2xl md:h-[90vh] flex-shrink-0 flex flex-col">
-        {/* Header */}
         <div className="sticky top-0 bg-white z-10 pb-2 border-b border-gray-200">
           <div className="flex items-center mb-4">
             <Mail className="w-6 h-6 text-gray-600 mr-2" />
             <h2 className="text-xl font-semibold text-gray-900">Inbox</h2>
           </div>
-
-          {/* Search */}
           <div className="relative">
             <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -303,15 +299,25 @@ const EmailAutomation = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-8 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                Clear
+              </button>
+            )}
             <Settings className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer" />
           </div>
         </div>
-
-        {/* Email List */}
         {loading ? (
-          <div className="text-center mt-4 text-gray-500">Loading...</div>
+          <div className="flex items-center justify-center mt-4 flex-1 text-gray-500">
+            <p>Loading...</p>
+          </div>
         ) : apiError ? (
-          <div className="text-center mt-4 text-red-500">{apiError}</div>
+          <div className="flex flex-col items-center justify-center mt-4 flex-1 text-red-500">
+            <Mail className="w-10 h-10 text-red-500 mb-4" />
+            <p>{apiError}</p>
+          </div>
         ) : !accessToken ? (
           <div className="flex flex-col items-center justify-center mt-4 flex-1">
             <Mail className="w-10 h-10 text-gray-400 mb-4" />
@@ -334,14 +340,17 @@ const EmailAutomation = () => {
                 emails.map((email) => (
                   <div
                     key={email.id}
-                    className={`p-3 border-b mb-2 cursor-pointer hover:bg-gray-50 rounded-xl ${
+                    className={`p-3 border-b mb-2 cursor-pointer hover:bg-gray-50 rounded-xl border-l-4 ${
                       selectedEmail === email.id
-                        ? "bg-blue-50 border-l-4 border-blue-500"
+                        ? "border-blue-500 bg-blue-50"
                         : email.isUnread
-                        ? "border-l-4 border-[#C4E8DA]"
-                        : ""
+                        ? "border-[#C4E8DA]"
+                        : "border-gray-300"
                     }`}
-                    onClick={() => setSelectedEmail(email.id)}>
+                    onClick={() => {
+                      console.log("Selected email:", email.id);
+                      setSelectedEmail(email.id);
+                    }}>
                     <div className="flex justify-between items-start mb-1">
                       <span className="font-medium text-left text-gray-900 truncate w-[50%]">
                         {extractName(email.sender)}
@@ -364,13 +373,12 @@ const EmailAutomation = () => {
                   </div>
                 ))
               ) : (
-                <div className="text-center mt-4 text-gray-500">
-                  No emails found.
+                <div className="flex flex-col items-center justify-center mt-4 flex-1 text-gray-500">
+                  <Mail className="w-10 h-10 text-gray-500 mb-4" />
+                  <p>No emails found.</p>
                 </div>
               )}
             </div>
-
-            {/* Pagination Buttons */}
             <div className="flex justify-end space-x-4 mt-4">
               <button
                 className="px-4 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 disabled:opacity-50"
@@ -399,21 +407,16 @@ const EmailAutomation = () => {
           </>
         )}
       </div>
-
-      {/* Chat Area */}
       <div className="flex-1 flex flex-col mt-6 md:mt-0 md:ml-6 bg-white rounded-2xl overflow-hidden">
         {selectedEmail ? (
           <>
-            {/* Chat Header */}
             <div className="p-6 border-b border-gray-200 bg-white">
               <h3 className="text-lg font-semibold text-gray-900">
                 {emails.find((e) => e.id === selectedEmail)?.subject}
               </h3>
             </div>
-
-            {/* Chat Content - single scroll container */}
             <div
-              className="flex flex-col overflow-y-auto  space-y-4 p-6 bg-gray-50"
+              className="flex flex-col overflow-y-auto space-y-4 p-6 bg-gray-50"
               style={{ height: "600px" }}>
               <iframe
                 srcDoc={emailBody}
@@ -430,11 +433,11 @@ const EmailAutomation = () => {
                     <div
                       className={`p-4 rounded-2xl max-w-xl shadow-sm ${
                         msg.type === "user"
-                          ? "bg-green-100  self-end rounded-br-none"
+                          ? "bg-green-100 self-end rounded-br-none"
                           : "bg-gray-200 text-gray-900 self-start rounded-bl-none"
                       }`}>
                       <ReactMarkdown>{msg.message}</ReactMarkdown>
-                      <p className="text-xs  mt-1 text-right select-none">
+                      <p className="text-xs mt-1 text-right select-none">
                         {new Date(msg.timestamp).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -443,8 +446,6 @@ const EmailAutomation = () => {
                     </div>
                   </div>
                 ))}
-
-                {/* Typing Indicator */}
                 {isTyping && (
                   <div className="flex justify-start animate-fade-in mt-2">
                     <div className="flex max-w-4xl">
@@ -457,10 +458,10 @@ const EmailAutomation = () => {
                             <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
                             <div
                               className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"
-                              style={{ animationDelay: "0.1s" }}></div>
+                              style={{ rebellionDelay: "0.1s" }}></div>
                             <div
                               className="w-2 h-2 bg-teal-400 rounded-full animate-bounce"
-                              style={{ animationDelay: "0.2s" }}></div>
+                              style={{ rebellionDelay: "0.2s" }}></div>
                           </div>
                           <span className="text-gray-400 text-sm">
                             AI is thinking...
@@ -472,8 +473,6 @@ const EmailAutomation = () => {
                 )}
               </div>
             </div>
-
-            {/* Chat Input */}
             <div className="m-2 p-4 rounded-lg bg-white border border-gray-200">
               <div className="flex items-center space-x-3 mb-3">
                 <input
@@ -491,9 +490,6 @@ const EmailAutomation = () => {
               </div>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center space-x-2 flex-wrap">
-                  {/* <div className="bg-[#E2F4EC] p-2 rounded-full">
-                    <Plus className="w-5 h-5 text-gray-400" />
-                  </div> */}
                   {tags.map((tag) => (
                     <button
                       onClick={() => setMessage(tag)}

@@ -20,11 +20,19 @@ export default function Search() {
   const { title } = useParams();
   const resultsRef = useRef(null);
   const recognitionRef = useRef(null);
+  const inputRef = useRef(null);
 
   // Scroll to bottom when new data is added
   const scrollToBottom = () => {
     resultsRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  useEffect(() => {
+    if (inputRef.current) {
+      const input = inputRef.current;
+      input.focus();
+    }
+  }, [plainMessages]);
 
   useEffect(() => {
     scrollToBottom();
@@ -82,6 +90,23 @@ export default function Search() {
     }
   };
 
+  useEffect(() => {
+    // Load messages from sessionStorage on mount
+    const savedMessages = sessionStorage.getItem(title);
+    if (savedMessages) {
+      setPlainMessages(JSON.parse(savedMessages));
+    }
+    scrollToBottom();
+  }, []);
+
+  useEffect(() => {
+    // Save messages to sessionStorage whenever they change
+    if (plainMessages.length > 0) {
+      sessionStorage.setItem(title, JSON.stringify(plainMessages));
+      scrollToBottom();
+    }
+  }, [plainMessages, title]);
+
   const handleInputChange = (e) => {
     const value = e.target.value;
     setSearchText(value);
@@ -114,7 +139,7 @@ export default function Search() {
       };
 
       const response = await axios.post(
-        "https://wbsl64n9-8005.inc1.devtunnels.ms/chat",
+        `${import.meta.env.VITE_AI_BACKEND}/chat`,
         payload
       );
 
@@ -124,34 +149,45 @@ export default function Search() {
         setSessionId(data.session_id);
       }
 
-      // Process response
-      if (data.response && data.response.includes("*")) {
-        const newServices = data.response
-          .split("\n\n")
-          .filter((item) => item.startsWith("*"))
-          .map((item) => {
-            const [name, ...descriptionParts] = item
-              .replace(/^\*\s*/, "")
-              .split(": ");
-            const description = descriptionParts.join(": ").trim();
-            const sourceMatch = description.match(
-              /Source: (https?:\/\/[^\s]+)/
-            );
-            const source = sourceMatch ? sourceMatch[1] : null;
-            const cleanDescription = source
-              ? description.replace(/Source: https?:\/\/[^\s]+/, "").trim()
-              : description;
-            return { name, description: cleanDescription, source };
-          });
-        setSpaServices((prev) => [...prev, ...newServices]);
-      } else {
-        const newMessage =
-          data.response || "No detailed information available.";
-        setPlainMessages((prev) => [
-          ...prev,
-          { type: "ai", content: newMessage },
-        ]);
+      const newMessage = data.response || "No detailed information available.";
+      setPlainMessages((prev) => [
+        ...prev,
+        { type: "ai", content: newMessage },
+      ]);
+
+      if (inputRef.current) {
+        const input = inputRef.current;
+        input.focus();
       }
+
+      // Process response
+      // if (data.response && data.response.includes("*")) {
+      //   const newServices = data.response
+      //     .split("\n\n")
+      //     .filter((item) => item.startsWith("*"))
+      //     .map((item) => {
+      //       const [name, ...descriptionParts] = item
+      //         .replace(/^\*\s*/, "")
+      //         .split(": ");
+      //       const description = descriptionParts.join(": ").trim();
+      //       const sourceMatch = description.match(
+      //         /Source: (https?:\/\/[^\s]+)/
+      //       );
+      //       const source = sourceMatch ? sourceMatch[1] : null;
+      //       const cleanDescription = source
+      //         ? description.replace(/Source: https?:\/\/[^\s]+/, "").trim()
+      //         : description;
+      //       return { name, description: cleanDescription, source };
+      //     });
+      //   setSpaServices((prev) => [...prev, ...newServices]);
+      // } else {
+      //   const newMessage =
+      //     data.response || "No detailed information available.";
+      //   setPlainMessages((prev) => [
+      //     ...prev,
+      //     { type: "ai", content: newMessage },
+      //   ]);
+      // }
     } catch (err) {
       setError("An error occurred while fetching data. Please try again.");
       console.error(err);
@@ -327,12 +363,12 @@ export default function Search() {
             <div className="flex-1 relative group">
               <input
                 type="text"
+                ref={inputRef}
                 value={searchText}
                 onChange={handleInputChange}
                 onKeyPress={(e) => e.key === "Enter" && handleExplore(e)}
                 placeholder={`Ask about ${title || "spa"} services... ✨`}
                 className="w-full px-6 py-4 pr-14 bg-white rounded-2xl outline-none text-black border border-gray-300 shadow-md transition-all duration-300 placeholder-gray-400 text-sm"
-                disabled={loading}
               />
               <button
                 type="button"
