@@ -5,9 +5,8 @@ import { Link, useNavigate } from "react-router-dom";
 import logo from "../../assets/logo/logo.png";
 import axiosInstance from "../../components/axiosinstance";
 import { useAuth } from "../../components/authContext";
-import { useGoogleLogin } from "@react-oauth/google";
-
-import axios from "axios";
+import useGoogleAuth from "../../hooks/useGoogleAuth";
+import { getApiErrorMessage } from "../../utils/validation";
 
 const SignIn = () => {
   const {
@@ -34,74 +33,21 @@ const SignIn = () => {
 
     try {
       const response = await axiosInstance.post("api/auth/sign-in/", payload);
-      console.log("Login successful:", response.data);
-      // Store token or user data if needed (e.g., localStorage.setItem("token", response.data.token))
-      if (response.status === 200) {
-        login(
-          response.data.access_token,
-          response.data.email_address,
-          response.data.profile.first_name,
-          response.data.refresh_token
-        );
-        navigate("/");
-      }
+      login(response.data);
+      navigate("/");
     } catch (error) {
-      console.log("Login error:", error);
-      if (error.response) {
-        setApiError(
-          error.response.data.message || "Invalid email or password."
-        );
-      } else {
-        setApiError("Invalid email or password.");
+      // Unverified account: the backend has emailed a new OTP
+      if (error.response?.status === 403 && error.response.data?.user_id) {
+        navigate("/otp", { state: { user_id: error.response.data.user_id } });
+        return;
       }
+      setApiError(getApiErrorMessage(error, "Invalid email or password."));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const goolelogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      const { access_token } = tokenResponse;
-      localStorage.setItem("gmail_access_token", access_token);
-
-      try {
-        const googleUser = await axios.get(
-          "https://www.googleapis.com/oauth2/v3/userinfo",
-          {
-            headers: {
-              Authorization: `Bearer ${access_token}`,
-            },
-          }
-        );
-
-        const { name, email, sub: google_id } = googleUser.data;
-
-        const response = await axiosInstance.post("/api/auth/google-login/", {
-          name,
-          email,
-          picture: googleUser.data.picture,
-          google_id,
-          access_token,
-        });
-
-        // Login and redirect
-        if (response.status === 200) {
-          login(
-            response.data.access_token,
-            response.data.email_address,
-            response.data.profile.first_name,
-            response.data.refresh_token
-          );
-          navigate("/");
-        }
-      } catch (err) {
-        console.error("Google login error", err);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    onError: () => setIsLoading(false),
-  });
+  const goolelogin = useGoogleAuth({ setIsLoading, setApiError });
 
   return (
     <div className="sm:grid flex flex-col grid-cols-7 min-h-screen bg-base-200">

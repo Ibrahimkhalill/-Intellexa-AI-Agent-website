@@ -6,6 +6,7 @@ import ResetPassword from "../Pages/Authentication/ResetPassword";
 export default function ForgetPasswordFlow() {
   const [step, setStep] = useState(1);
   const [user_id, setUserId] = useState("");
+  const [email, setEmail] = useState("");
   const [secret_key, setSecretKey] = useState("");
 
   const nextStep = () => setStep((prev) => prev + 1);
@@ -15,8 +16,10 @@ export default function ForgetPasswordFlow() {
     <div>
       {step === 1 && (
         <ForgetEmail
-          onSuccess={(user_id) => {
+          defaultEmail={email}
+          onSuccess={(user_id, email) => {
             setUserId(user_id);
+            setEmail(email);
             nextStep();
           }}
         />
@@ -24,6 +27,7 @@ export default function ForgetPasswordFlow() {
       {step === 2 && (
         <ForgetOtpVerification
           user_id={user_id}
+          email={email}
           onSuccess={(user_id, secret_key) => {
             setSecretKey(secret_key);
             setUserId(user_id);

@@ -1,134 +1,80 @@
-"use client";
-
 import { useState, useRef, useEffect } from "react";
-import { User, Bot, Sparkles, Zap, Star } from "lucide-react";
+import { User, Bot, Sparkles } from "lucide-react";
 import { HiOutlineMicrophone } from "react-icons/hi";
 import { FaRegCircleStop } from "react-icons/fa6";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
+import FloatingParticles from "../../../components/FloatingParticles";
+import useSpeechRecognition from "../../../hooks/useSpeechRecognition";
+
+// Each agent (title) keeps its own chat history and session in sessionStorage
+const loadChat = (title) => {
+  try {
+    return JSON.parse(sessionStorage.getItem(`agent-chat:${title}`)) || {};
+  } catch {
+    return {};
+  }
+};
 
 export default function Search() {
+  const { title } = useParams();
   const [searchText, setSearchText] = useState("");
-  const [spaServices, setSpaServices] = useState([]);
-  const [plainMessages, setPlainMessages] = useState([]);
-  const [sessionId, setSessionId] = useState(null);
+  const [spaServices] = useState([]);
+  const [plainMessages, setPlainMessages] = useState(() => loadChat(title).messages || []);
+  const [sessionId, setSessionId] = useState(() => loadChat(title).sessionId || null);
   const [loading, setLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState(null);
-  const { title } = useParams();
   const resultsRef = useRef(null);
-  const recognitionRef = useRef(null);
   const inputRef = useRef(null);
+  const loadedTitleRef = useRef(title);
 
   // Scroll to bottom when new data is added
   const scrollToBottom = () => {
     resultsRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Switching to another agent reuses this component - load that agent's chat
   useEffect(() => {
-    if (inputRef.current) {
-      const input = inputRef.current;
-      input.focus();
-    }
-  }, [plainMessages]);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [spaServices, plainMessages]);
-
-  // Initialize speech recognition
-  useEffect(() => {
-    if (
-      !("webkitSpeechRecognition" in window || "SpeechRecognition" in window)
-    ) {
-      console.warn("Speech Recognition not supported in this browser.");
-      return;
-    }
-
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setSearchText(transcript);
-    };
-
-    recognition.onerror = (event) => {
-      console.error("Speech recognition error", event.error);
-      setIsRecording(false);
-      setError("Speech recognition failed. Please try again.");
-    };
-
-    recognition.onend = () => {
-      setIsRecording(false);
-      if (searchText.trim()) {
-        handleExplore();
-      }
-    };
-
-    recognitionRef.current = recognition;
-  }, [searchText]);
-
-  const toggleRecording = () => {
-    if (isRecording) {
-      recognitionRef.current.stop();
-      setIsRecording(false);
-    } else {
-      try {
-        recognitionRef.current.start();
-        setIsRecording(true);
-      } catch (error) {
-        console.error("Speech recognition start error:", error);
-        setError("Failed to start speech recognition.");
-      }
-    }
-  };
-
-  useEffect(() => {
-    // Load messages from sessionStorage on mount
-    const savedMessages = sessionStorage.getItem(title);
-    if (savedMessages) {
-      setPlainMessages(JSON.parse(savedMessages));
-    }
-    scrollToBottom();
-  }, []);
+    if (loadedTitleRef.current === title) return;
+    loadedTitleRef.current = title;
+    const chat = loadChat(title);
+    setPlainMessages(chat.messages || []);
+    setSessionId(chat.sessionId || null);
+    setSearchText("");
+    setError(null);
+  }, [title]);
 
   useEffect(() => {
     // Save messages to sessionStorage whenever they change
-    if (plainMessages.length > 0) {
-      sessionStorage.setItem(title, JSON.stringify(plainMessages));
-      scrollToBottom();
-    }
-  }, [plainMessages, title]);
+    if (loadedTitleRef.current !== title) return;
+    sessionStorage.setItem(
+      `agent-chat:${title}`,
+      JSON.stringify({ messages: plainMessages, sessionId })
+    );
+    scrollToBottom();
+    inputRef.current?.focus();
+  }, [plainMessages, sessionId, title]);
 
   const handleInputChange = (e) => {
     const value = e.target.value;
     setSearchText(value);
   };
 
-  const handleExplore = async (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    if (!searchText.trim()) {
+  const sendMessage = async (text) => {
+    const userMessage = text.trim();
+    if (!userMessage) {
       setError("Please enter a search query.");
       return;
     }
+    if (loading) return;
 
     // Add user message to UI immediately
-    setPlainMessages((prev) => [
-      ...prev,
-      { type: "user", content: searchText },
-    ]);
-
+    setPlainMessages((prev) => [...prev, { type: "user", content: userMessage }]);
     setLoading(true);
     setIsTyping(true);
     setError(null);
-    const userMessage = searchText;
     setSearchText(""); // Clear input immediately after submission
 
     try {
@@ -150,44 +96,7 @@ export default function Search() {
       }
 
       const newMessage = data.response || "No detailed information available.";
-      setPlainMessages((prev) => [
-        ...prev,
-        { type: "ai", content: newMessage },
-      ]);
-
-      if (inputRef.current) {
-        const input = inputRef.current;
-        input.focus();
-      }
-
-      // Process response
-      // if (data.response && data.response.includes("*")) {
-      //   const newServices = data.response
-      //     .split("\n\n")
-      //     .filter((item) => item.startsWith("*"))
-      //     .map((item) => {
-      //       const [name, ...descriptionParts] = item
-      //         .replace(/^\*\s*/, "")
-      //         .split(": ");
-      //       const description = descriptionParts.join(": ").trim();
-      //       const sourceMatch = description.match(
-      //         /Source: (https?:\/\/[^\s]+)/
-      //       );
-      //       const source = sourceMatch ? sourceMatch[1] : null;
-      //       const cleanDescription = source
-      //         ? description.replace(/Source: https?:\/\/[^\s]+/, "").trim()
-      //         : description;
-      //       return { name, description: cleanDescription, source };
-      //     });
-      //   setSpaServices((prev) => [...prev, ...newServices]);
-      // } else {
-      //   const newMessage =
-      //     data.response || "No detailed information available.";
-      //   setPlainMessages((prev) => [
-      //     ...prev,
-      //     { type: "ai", content: newMessage },
-      //   ]);
-      // }
+      setPlainMessages((prev) => [...prev, { type: "ai", content: newMessage }]);
     } catch (err) {
       setError("An error occurred while fetching data. Please try again.");
       console.error(err);
@@ -201,22 +110,21 @@ export default function Search() {
     }
   };
 
-  const FloatingParticles = () => (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {[...Array(12)].map((_, i) => (
-        <div
-          key={i}
-          className="absolute w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full opacity-20 animate-pulse"
-          style={{
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 3}s`,
-            animationDuration: `${2 + Math.random() * 3}s`,
-          }}
-        />
-      ))}
-    </div>
-  );
+  // Voice input: send what was said as soon as recognition finishes
+  const { isRecording, toggleRecording } = useSpeechRecognition({
+    onResult: (transcript) => sendMessage(transcript),
+    onError: (code) =>
+      setError(
+        code === "not-supported"
+          ? "Speech recognition is not supported in this browser."
+          : "Speech recognition failed. Please try again."
+      ),
+  });
+
+  const handleExplore = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    sendMessage(searchText);
+  };
 
   return (
     <div className="flex h-screen bg-white overflow-hidden">
@@ -366,7 +274,7 @@ export default function Search() {
                 ref={inputRef}
                 value={searchText}
                 onChange={handleInputChange}
-                onKeyPress={(e) => e.key === "Enter" && handleExplore(e)}
+                onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && handleExplore(e)}
                 placeholder={`Ask about ${title || "spa"} services... ✨`}
                 className="w-full px-6 py-4 pr-14 bg-white rounded-2xl outline-none text-black border border-gray-300 shadow-md transition-all duration-300 placeholder-gray-400 text-sm"
               />

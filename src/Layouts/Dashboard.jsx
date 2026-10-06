@@ -1,7 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { IconContext } from "react-icons";
-import Swal from "sweetalert2";
 import {
   RiArrowRightSLine,
   RiLogoutBoxRLine,
@@ -14,168 +12,149 @@ import { SiBilibili } from "react-icons/si";
 import { HiOutlineBookmarkSquare } from "react-icons/hi2";
 import { useAuth } from "../components/authContext";
 import saveToken from "../components/saveToken";
+import { confirmAction } from "../utils/notify";
+import logo from "../assets/logo/logo.png";
+
+const MOBILE_BREAKPOINT = 768;
+
+// `match` lists extra path prefixes that should highlight the menu item
+const Menus = [
+  { title: "Home", path: "/", icon: RiHome9Line, gap: true },
+  { title: "AI Chat", path: "/noir_chat", icon: RiFolderUploadLine },
+  { title: "Work Flow", path: "/workflow", icon: RiVipCrownLine, match: ["/ai_search", "/email"] },
+  { title: "Offer Library", path: "/offer-library", icon: SiBilibili },
+  { title: "Booking List", path: "/booking-list", icon: HiOutlineBookmarkSquare, match: ["/booking"] },
+];
+
+const isMenuActive = (menu, pathname) =>
+  pathname === menu.path || (menu.match || []).some((prefix) => pathname.startsWith(prefix));
 
 const Dashboard = () => {
-  const [open, setOpen] = useState(true);
   const location = useLocation();
-  const { logout, isAuthenticated } = useAuth();
+  const { logout, isAuthenticated, auth } = useAuth();
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < MOBILE_BREAKPOINT);
+  const [open, setOpen] = useState(() => window.innerWidth >= MOBILE_BREAKPOINT);
 
   useEffect(() => {
     if (isAuthenticated) {
-      saveToken(); // call this once when Dashboard mounts
+      saveToken(); // register this browser for booking reminders
     }
   }, [isAuthenticated]);
 
-  const handleLogout = () => {
-    Swal.fire({
-      title: "Are you sure?",
-      text: "You want to logout!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Yes, Logout!",
-      cancelButtonText: "No, Cancel!",
-    }).then((result) => {
-      if (result.isConfirmed) {
-        logout();
-        console.log("User logged out");
-      }
-    });
-  };
-
+  const isMobileRef = useRef(isMobile);
   useEffect(() => {
     const handleResize = () => {
-      setOpen(window.innerWidth >= 768);
+      const mobile = window.innerWidth < MOBILE_BREAKPOINT;
+      if (mobile === isMobileRef.current) return; // only react when crossing the breakpoint
+      isMobileRef.current = mobile;
+      setIsMobile(mobile);
+      setOpen(!mobile);
     };
-    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const iconMappings = {
-    Upgrade: RiVipCrownLine,
-    Book: RiFolderUploadLine,
-    Home: RiHome9Line,
+  // On mobile the menu is an overlay - close it after navigating
+  useEffect(() => {
+    if (isMobile) setOpen(false);
+  }, [location.pathname, isMobile]);
+
+  const handleLogout = async () => {
+    const confirmed = await confirmAction({
+      title: "Log out?",
+      text: "You will need to sign in again.",
+      confirmButtonText: "Log out",
+    });
+    if (confirmed) logout();
   };
 
-  const Menus = [
-    {
-      title: "Home",
-      path: "/",
-      icon: iconMappings.Home,
-      role: "user",
-      gap: true,
-    },
-    {
-      title: "AI Chat",
-      path: "/noir_chat",
-      icon: iconMappings.Book,
-      role: "user",
-    },
-    {
-      title: "Work Flow",
-      path: "/worlflow",
-      icon: iconMappings.Upgrade,
-      role: "user",
-    },
-    {
-      title: "Offer Library",
-      path: "/offer-library",
-      icon: SiBilibili,
-      role: "user",
-    },
-    {
-      title: "Booking List",
-      path: "/booking-list",
-      icon: HiOutlineBookmarkSquare,
-      role: "user",
-    },
-  ];
-
-  const studentMenus = Menus.filter((menu) => menu.role === "user");
+  const labelClass = `${!open && "hidden"} origin-left duration-200 whitespace-nowrap`;
 
   return (
     <div className="flex">
+      {/* Backdrop for the mobile overlay menu */}
+      {isMobile && open && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40"
+          onClick={() => setOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar */}
-      <div
+      <nav
         className={`${
           open ? "!w-52 !p-4" : "!w-14 !text-center"
         } !h-screen !bg-base-300 fixed left-0 top-0 bottom-0 z-50 !pt-8 transition-all duration-500`}>
-        <RiArrowRightSLine
-          className={`absolute cursor-pointer -right-5 !text-gray-400 !bg-base-300 shadow-2xl top-9 w-10 h-10 rounded-full ${
-            !open && "rotate-180"
-          }`}
+        <button
+          type="button"
           onClick={() => setOpen(!open)}
-        />
-        <div className="flex items-center gap-x-4 p-2">
-          <img
-            src="/your-logo.png"
-            alt="logo"
-            className="cursor-pointer w-full md:w-9/12 p-1 duration-500"
+          aria-label={open ? "Collapse menu" : "Expand menu"}
+          className="absolute -right-5 top-9">
+          <RiArrowRightSLine
+            className={`cursor-pointer !text-gray-400 !bg-base-300 shadow-2xl w-10 h-10 rounded-full transition-transform ${
+              open && "rotate-180"
+            }`}
           />
+        </button>
+        <div className="flex items-center gap-x-4 p-2">
+          <img src={logo} alt="Intellexa" className="w-full md:w-9/12 p-1 duration-500" />
         </div>
 
-        <ul
-          className={`${
-            open ? "" : "flex flex-col items-center justify-center"
-          }`}>
-          {studentMenus.map((Menu, index) => (
-            <Link
-              to={Menu.path}
-              key={index}
-              className={`flex rounded-full py-1.5 px-4 cursor-pointer text-sm items-center ${
-                Menu.gap ? "mt-9" : "mt-2"
-              } ${
-                location.pathname === Menu.path
-                  ? "!bg-[#1E2839] !text-white"
-                  : "hover:!bg-white"
-              }`}>
-              <li className="flex items-center gap-x-2 text-md">
-                <IconContext.Provider value={{ className: "react-icon" }}>
-                  <Menu.icon className="text-lg" />
-                </IconContext.Provider>
-                <span
-                  className={`${!open && "hidden"} origin-left duration-200`}>
-                  {Menu.title}
-                </span>
+        <ul className={open ? "" : "flex flex-col items-center justify-center"}>
+          {Menus.map((menu) => {
+            const Icon = menu.icon;
+            return (
+              <li key={menu.path} className={menu.gap ? "mt-9" : "mt-2"}>
+                <Link
+                  to={menu.path}
+                  title={menu.title}
+                  className={`flex rounded-full py-1.5 px-4 text-sm items-center gap-x-2 ${
+                    isMenuActive(menu, location.pathname)
+                      ? "!bg-[#1E2839] !text-white"
+                      : "hover:!bg-white"
+                  }`}>
+                  <Icon className="text-lg shrink-0" />
+                  <span className={labelClass}>{menu.title}</span>
+                </Link>
               </li>
-            </Link>
-          ))}
+            );
+          })}
         </ul>
 
         {/* Profile + Logout */}
-        <div className="mt-28 ms-3.5 md:ms-0 bottom-20 absolute w-full">
-          <Link
-            to="/profile"
-            className={`-ml-3.5 flex p-2 pl-6 cursor-pointer text-sm items-center w-full ${
-              location.pathname === "/profile" ? "!bg-white" : "hover:!bg-white"
-            }`}>
-            <li className="flex items-center gap-x-4 w-full">
-              <RiMapPinUserLine className="text-xl" />
-              <span className={`${!open && "hidden"} origin-left duration-200`}>
-                Profile
-              </span>
-            </li>
-          </Link>
-          <button
-            onClick={handleLogout}
-            className="flex !text-red-400 p-2 text-sm items-center cursor-pointer w-full">
-            <li className="flex items-center gap-x-4 w-full">
-              <RiLogoutBoxRLine className="text-xl" />
-              <span className={`${!open && "hidden"} origin-left duration-200`}>
-                Logout
-              </span>
-            </li>
-          </button>
-        </div>
-      </div>
+        <ul className="mt-28 ms-3.5 md:ms-0 bottom-20 absolute w-full">
+          <li>
+            <Link
+              to="/profile"
+              title="Profile"
+              className={`-ml-3.5 flex p-2 pl-6 text-sm items-center gap-x-4 w-full ${
+                location.pathname === "/profile" ? "!bg-white" : "hover:!bg-white"
+              }`}>
+              <RiMapPinUserLine className="text-xl shrink-0" />
+              <span className={`${labelClass} truncate`}>{auth.username || "Profile"}</span>
+            </Link>
+          </li>
+          <li>
+            <button
+              type="button"
+              onClick={handleLogout}
+              title="Logout"
+              className="flex !text-red-400 p-2 text-sm items-center gap-x-4 cursor-pointer w-full">
+              <RiLogoutBoxRLine className="text-xl shrink-0" />
+              <span className={labelClass}>Logout</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
 
-      {/* Main Content Area */}
-      <div
+      {/* Main Content Area - on mobile the open menu overlays instead of pushing */}
+      <main
         className={`${
-          open ? "!pl-52" : "!pl-14 !pr-2"
-        } flex-1 overflow-y-auto transition-all duration-500 h-[100vh]`}>
+          open && !isMobile ? "!pl-52" : "!pl-14 !pr-2"
+        } flex-1 min-w-0 overflow-y-auto transition-all duration-500 h-[100vh]`}>
         <Outlet />
-      </div>
+      </main>
     </div>
   );
 };

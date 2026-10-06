@@ -1,24 +1,35 @@
-import { createBrowserRouter } from "react-router-dom";
+import { lazy, Suspense } from "react";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import Dashboard from "../Layouts/Dashboard";
-import Signup from "../Pages/Authentication/Signup";
-import SignIn from "../Pages/Authentication/SignIn";
-import ProfilePage from "../Pages/Authentication/Profile/ProfilePage";
-import HomePage from "../Pages/Dashboard/HomePage/HomePage";
-import OtpVerification from "../Pages/Authentication/OtpVerification";
-import EmailAutomation from "../Pages/Dashboard/Email/EmailAutomation";
-import WorkFlow from "../Pages/Dashboard/Worlflow/WorkFlow";
-import BookingList from "../Pages/Dashboard/booking/BookingList";
-import OfferLibrary from "../Pages/Dashboard/offer/OfferLibrary";
-import AllOferLibrary from "../Pages/Dashboard/offer/AllOferLibrary";
-import BookingDeatils from "../Pages/Dashboard/booking/BookingDeatils";
-import BookingForm from "../Pages/Dashboard/BookingForm/BookingForm";
-import Search from "../Pages/Dashboard/Worlflow/Search";
-import NoirChat from "../Pages/Dashboard/NoirChat/NoirChat";
 import PrivateRoute from "./PrivateRoute";
 import PublicRoute from "./PublicRoute";
-import ForgetPasswordFlow from "./ForgetPasswordFlow";
-import CancelPage from "../components/CancelPage";
-import SuccessPage from "../components/SuccessPage";
+import PageLoader from "../components/PageLoader";
+import NotFound from "../components/NotFound";
+
+// Each page is its own chunk, downloaded the first time it is opened
+const SignIn = lazy(() => import("../Pages/Authentication/SignIn"));
+const Signup = lazy(() => import("../Pages/Authentication/Signup"));
+const OtpVerification = lazy(() => import("../Pages/Authentication/OtpVerification"));
+const ForgetPasswordFlow = lazy(() => import("./ForgetPasswordFlow"));
+const ProfilePage = lazy(() => import("../Pages/Authentication/Profile/ProfilePage"));
+const HomePage = lazy(() => import("../Pages/Dashboard/HomePage/HomePage"));
+const NoirChat = lazy(() => import("../Pages/Dashboard/NoirChat/NoirChat"));
+const BookingList = lazy(() => import("../Pages/Dashboard/booking/BookingList"));
+const BookingForm = lazy(() => import("../Pages/Dashboard/BookingForm/BookingForm"));
+const OfferLibrary = lazy(() => import("../Pages/Dashboard/offer/OfferLibrary"));
+const EmailAutomation = lazy(() => import("../Pages/Dashboard/Email/EmailAutomation"));
+const WorkFlow = lazy(() => import("../Pages/Dashboard/Workflow/WorkFlow"));
+const Search = lazy(() => import("../Pages/Dashboard/Workflow/Search"));
+const SuccessPage = lazy(() => import("../components/SuccessPage"));
+const CancelPage = lazy(() => import("../components/CancelPage"));
+
+const page = (Component) => (
+  <Suspense fallback={<PageLoader />}>
+    <Component />
+  </Suspense>
+);
+
+const publicPage = (Component) => <PublicRoute>{page(Component)}</PublicRoute>;
 
 const router = createBrowserRouter([
   {
@@ -29,54 +40,26 @@ const router = createBrowserRouter([
       </PrivateRoute>
     ),
     children: [
-      { path: "/", element: <HomePage /> },
-      { path: "/noir_chat", element: <NoirChat /> },
-      { path: "/booking-list", element: <BookingList /> },
-      { path: "/offer-library", element: <OfferLibrary /> },
-      { path: "/email/:title", element: <EmailAutomation /> },
-      { path: "/ai_search/:title", element: <Search /> },
-      { path: "/worlflow", element: <WorkFlow /> },
-      { path: "/profile", element: <ProfilePage /> },
-      { path: "/offer-libray/:name", element: <AllOferLibrary /> },
-      { path: "/booking-deatils", element: <BookingDeatils /> },
-      { path: "/booking", element: <BookingForm /> },
-      { path: "/payment/success", element: <SuccessPage /> },
-      { path: "/payment/cancel", element: <CancelPage /> },
+      { path: "/", element: page(HomePage) },
+      { path: "/noir_chat", element: page(NoirChat) },
+      { path: "/booking-list", element: page(BookingList) },
+      { path: "/offer-library", element: page(OfferLibrary) },
+      { path: "/email/:title", element: page(EmailAutomation) },
+      { path: "/ai_search/:title", element: page(Search) },
+      { path: "/workflow", element: page(WorkFlow) },
+      { path: "/worlflow", element: <Navigate to="/workflow" replace /> }, // old URL
+      { path: "/profile", element: page(ProfilePage) },
+      { path: "/booking", element: page(BookingForm) },
+      { path: "/booking/:bookingId", element: page(BookingForm) },
+      { path: "/payment/success", element: page(SuccessPage) },
+      { path: "/payment/cancel", element: page(CancelPage) },
     ],
   },
-
-  {
-    path: "/signin",
-    element: (
-      <PublicRoute>
-        <SignIn />
-      </PublicRoute>
-    ),
-  },
-  {
-    path: "/signup",
-    element: (
-      <PublicRoute>
-        <Signup />
-      </PublicRoute>
-    ),
-  },
-  {
-    path: "/otp",
-    element: (
-      <PublicRoute>
-        <OtpVerification />
-      </PublicRoute>
-    ),
-  },
-  {
-    path: "/forget-password",
-    element: (
-      <PublicRoute>
-        <ForgetPasswordFlow />
-      </PublicRoute>
-    ),
-  },
+  { path: "/signin", element: publicPage(SignIn) },
+  { path: "/signup", element: publicPage(Signup) },
+  { path: "/otp", element: publicPage(OtpVerification) },
+  { path: "/forget-password", element: publicPage(ForgetPasswordFlow) },
+  { path: "*", element: <NotFound /> },
 ]);
 
 export default router;

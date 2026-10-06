@@ -1,71 +1,66 @@
 import axios from "axios";
-import Cookies from "js-cookie";
 
-const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_REACT_BASE_URL,
-});
+export const AUTH_LOGOUT_EVENT = "auth:logout";
+export const AUTH_USER_KEY = "authUser";
 
-// Attach access token to headers
-axiosInstance.interceptors.request.use(
-  async (config) => {
-    const token = Cookies.get("authToken"); // ✅ Get from cookies
-    if (token) {
-      config.headers["Authorization"] = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Refresh token handler
-const refreshAccessToken = async () => {
+// Auth tokens live in httpOnly cookies set by the backend - JavaScript never
+// sees them. We only keep non-sensitive user info to know who is logged in.
+export const isLoggedIn = () => {
   try {
-    const refreshToken = Cookies.get("refreshToken"); // ✅ Get from cookies
-    if (!refreshToken) {
-      throw new Error("No refresh token found");
-    }
-
-    const response = await axios.post(
-      `${import.meta.env.VITE_REACT_BASE_URL}/api/auth/refresh/`,
-      {
-        refresh_token: refreshToken,
-      }
-    );
-
-    const { access_token } = response.data;
-
-    // ✅ Set new access token in cookies
-    Cookies.set("authToken", access_token, {
-      secure: true,
-      sameSite: "Strict",
-    });
-
-    return access_token;
-  } catch (error) {
-    Cookies.remove("refreshToken");
-    Cookies.remove("authToken");
-    console.error("Error refreshing access token:", error);
-    throw new Error("Failed to refresh access token");
+    return Boolean(localStorage.getItem(AUTH_USER_KEY));
+  } catch {
+    return false;
   }
 };
 
-// Handle 401
+const axiosInstance = axios.create({
+  baseURL: import.meta.env.VITE_REACT_BASE_URL,
+  withCredentials: true, // send the auth cookies
+  headers: {
+    // Required by the backend for cookie-authenticated writes (CSRF defence)
+    "X-Requested-With": "XMLHttpRequest",
+  },
+});
+
+// Share one refresh request between all requests that fail at the same time
+let refreshPromise = null;
+
+const refreshAccessToken = () =>
+  axios.post(`${import.meta.env.VITE_REACT_BASE_URL}/api/auth/refresh/`, null, {
+    withCredentials: true,
+    headers: { "X-Requested-With": "XMLHttpRequest" },
+  });
+
+const isAuthEndpoint = (url = "") =>
+  ["api/auth/sign-in/", "api/auth/refresh/", "api/auth/logout/"].some((path) =>
+    url.includes(path)
+  );
+
+// Handle 401: refresh the access cookie once, then retry the request
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
     if (
-      error.response &&
-      error.response.status === 401 &&
-      !originalRequest._retry
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !isAuthEndpoint(originalRequest.url) &&
+      isLoggedIn()
     ) {
       originalRequest._retry = true;
 
-      const newToken = await refreshAccessToken();
-      if (newToken) {
-        originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
+      try {
+        refreshPromise = refreshPromise || refreshAccessToken();
+        await refreshPromise;
         return axiosInstance(originalRequest);
+      } catch (refreshError) {
+        // Session is over - log the user out everywhere in the app
+        console.error("Error refreshing access token:", refreshError);
+        window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT));
+      } finally {
+        refreshPromise = null;
       }
     }
 
