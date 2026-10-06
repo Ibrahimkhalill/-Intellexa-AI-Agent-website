@@ -3,9 +3,8 @@ import { useState } from "react";
 import { FaEye, FaEyeSlash, FaMailBulk, FaUser } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import axiosInstance from "../../components/axiosinstance";
-import { useGoogleLogin } from "@react-oauth/google";
-import axios from "axios";
-import { useAuth } from "../../components/authContext";
+import useGoogleAuth from "../../hooks/useGoogleAuth";
+import { getApiErrorMessage, passwordRules } from "../../utils/validation";
 const Signup = () => {
   const {
     register,
@@ -16,7 +15,6 @@ const Signup = () => {
   const [apiError, setApiError] = useState(null);
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth(); // Assuming useAuth is imported from authContext
 
   const togglePasswordVisibility = () => {
     setShowPassword((prev) => !prev);
@@ -35,76 +33,17 @@ const Signup = () => {
 
     try {
       const response = await axiosInstance.post("api/auth/sign-up/", payload);
-      console.log("Signup successful:", response.data);
       // Redirect to OTP page after successful signup
-
-      if (response.status === 201) {
-        navigate("/otp", { state: { user_id: response.data.user_id } });
-      }
+      localStorage.removeItem("otp_timer"); // a new OTP was just sent
+      navigate("/otp", { state: { user_id: response.data.user_id } });
     } catch (error) {
-      // Handle API errors
-      if (error.response) {
-        setApiError(
-          error.response.data.message || "Signup failed. Please try again."
-        );
-      } else {
-        setApiError("Network error. Please check your connection.");
-      }
+      setApiError(getApiErrorMessage(error, "Signup failed. Please try again."));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const goolelogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      const { access_token } = tokenResponse;
-      localStorage.setItem("gmail_access_token", access_token);
-
-      try {
-        const googleUser = await axios.get(
-          "https://www.googleapis.com/oauth2/v3/userinfo",
-          {
-            headers: {
-              Authorization: `Bearer ${access_token}`,
-            },
-          }
-        );
-
-        const { name, email, sub: google_id } = googleUser.data;
-
-        const response = await axiosInstance.post("/api/auth/google-login/", {
-          name,
-          email,
-          picture: googleUser.data.picture,
-          google_id,
-          access_token,
-        });
-
-        // Login and redirect
-        if (response.status === 200) {
-          login(
-            response.data.access_token,
-            response.data.email_address,
-            response.data.profile.first_name,
-            response.data.refresh_token
-          );
-          navigate("/");
-        }
-      } catch (err) {
-        console.error("Google login error", err);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    onError: (error) => {
-      if (error.error === "popup_closed_by_user") {
-        console.log("User closed the Google login popup");
-      } else {
-        console.error("Google login failed:", error);
-      }
-      setIsLoading(false);
-    },
-  });
+  const goolelogin = useGoogleAuth({ setIsLoading, setApiError });
 
   return (
     <div className="sm:grid flex flex-col grid-cols-7 min-h-screen bg-base-200">
@@ -112,8 +51,7 @@ const Signup = () => {
       <div className="col-span-3 bg-[#F5F4F0] flex items-center p-8">
         <div className="flex flex-col">
           <h2 className="text-black text-4xl font-bold leading-normal">
-            Welcome Back! Verify Your <br /> Email to Access Your <br />{" "}
-            Learning Portal!
+            Create Your Account <br /> and Meet Your <br /> AI Assistant
           </h2>
           <p className="text-[#A1A1A1] text-sm mt-3">
             Join us to access personalized AI solutions built for productivity
@@ -215,16 +153,7 @@ const Signup = () => {
                   type={showPassword ? "text" : "password"}
                   {...register("password", {
                     required: "Password is required",
-                    minLength: {
-                      value: 8,
-                      message: "Password must be at least 8 characters",
-                    },
-                    pattern: {
-                      value:
-                        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
-                      message:
-                        "Password must include uppercase, lowercase, number, and special character",
-                    },
+                    ...passwordRules,
                   })}
                   placeholder="Enter your Password"
                   className="w-full border border-base-300 bg-base-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -253,11 +182,7 @@ const Signup = () => {
                   className="mr-2"
                 />
                 I agree to the{" "}
-                <Link
-                  to="/terms"
-                  className="text-blue-500 ps-1 hover:underline">
-                  Terms and Conditions
-                </Link>
+                <span className="text-blue-500 ps-1">Terms and Conditions</span>
               </div>
               {errors.terms && (
                 <p className="text-red-500 text-sm mt-1">

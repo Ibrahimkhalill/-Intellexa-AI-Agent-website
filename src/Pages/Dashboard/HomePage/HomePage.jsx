@@ -1,80 +1,11 @@
 import { ChevronRight } from "lucide-react";
-import AutomationAiSupport from "../Worlflow/AutomationAiSupport";
-import axiosInstance from "../../../components/axiosinstance";
-import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import AutomationAiSupport from "../Workflow/AutomationAiSupport";
+import { useBookings } from "../../../hooks/useApi";
 
 const HomePage = () => {
-  const [bookings, setBookings] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const { data: bookings = [], isLoading: loading } = useBookings();
 
-  useEffect(() => {
-    const fetchBookings = async () => {
-      setLoading(true);
-
-      try {
-        const response = await axiosInstance.get("api/booking/list/");
-        setBookings(response.data || []);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchBookings();
-  }, []);
-
-  // const automationTemplates = [
-  //   {
-  //     title: "Flight Booking",
-  //     description:
-  //       "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-  //     icons: [flightImg, aiImg, flightImg1],
-  //   },
-  //   {
-  //     title: "Restaurant Booking",
-  //     description:
-  //       "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-  //     icons: [restaurantImg, aiImg, Hotel_book],
-  //   },
-  //   {
-  //     title: "Spa Booking",
-  //     description:
-  //       "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-  //     icons: [spaImg, aiImg, BookNow],
-  //   },
-  //   {
-  //     title: "Birthday Booking",
-  //     description:
-  //       "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-  //     icons: [birthdayImg, aiImg, Birthday_book],
-  //   },
-  //   {
-  //     title: "Concert Tickets Booking",
-  //     description:
-  //       "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-  //     icons: [concertImg, aiImg, documentImg],
-  //   },
-
-  //   {
-  //     title: "Spa Booking",
-  //     description:
-  //       "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-  //     icons: [spaImg, aiImg, BookNow],
-  //   },
-
-  //   {
-  //     title: "Email Automation",
-  //     description:
-  //       "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-  //     icons: [emailImg, aiImg, emailImg],
-  //   },
-  //   {
-  //     title: "Hotel Reservation",
-  //     description:
-  //       "Summarize emails with Gmail and OpenAI, then send the summaries to the client.",
-  //     icons: [hotelImg, aiImg, res],
-  //   },
-  // ];
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -105,7 +36,9 @@ const HomePage = () => {
               <h1 className="text-2xl font-semibold text-gray-900">
                 Workflow Overview
               </h1>
-              <ChevronRight className="w-6 h-6 text-gray-400" />
+              <Link to="/booking-list" aria-label="View all bookings">
+                <ChevronRight className="w-6 h-6 text-gray-400 hover:text-gray-700" />
+              </Link>
             </div>
             <table className="w-full">
               <thead className="bg-blue-50">
@@ -117,7 +50,15 @@ const HomePage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {bookings.length > 0 &&
+                {(loading || bookings.length === 0) && (
+                  <tr>
+                    <td colSpan="4" className="px-6 py-4 text-sm text-gray-500 text-center">
+                      {loading ? "Loading bookings..." : "No bookings yet."}
+                    </td>
+                  </tr>
+                )}
+                {!loading &&
+                  bookings.length > 0 &&
                   bookings.slice(0, 5).map((booking) => (
                     <tr key={booking.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -129,7 +70,7 @@ const HomePage = () => {
                         Booking
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {booking.location}
+                        {booking.location || "—"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatBookingDate(booking.booking_datetime)}

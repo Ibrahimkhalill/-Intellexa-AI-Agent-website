@@ -13,6 +13,40 @@ import {
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import axiosInstance from "../../../components/axiosinstance";
+import {
+  useInvoices,
+  usePlans,
+  useProfile,
+  useSubscription,
+  useToggleAutoRenew,
+  useUpdateProfile,
+} from "../../../hooks/useApi";
+import { confirmAction, notify } from "../../../utils/notify";
+import { getApiErrorMessage, passwordRules } from "../../../utils/validation";
+
+const DEFAULT_AVATAR =
+  "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&h=80&fit=crop&crop=face";
+
+const emptyProfile = {
+  id: null,
+  first_name: "",
+  last_name: "",
+  phone_number: "",
+  address: "",
+  company_name: "",
+  profile_picture: null,
+  email_address: "",
+  google_profile_picture: null,
+};
+
+const formatDay = (dateString) =>
+  dateString
+    ? new Date(dateString).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "—";
 
 export default function ProfilePage() {
   const {
@@ -31,23 +65,46 @@ export default function ProfilePage() {
     new: false,
     confirm: false,
   });
-  const [profileData, setProfileData] = useState({
-    id: null,
-    first_name: "",
-    last_name: "",
-    phone_number: "",
-    address: "",
-    company_name: "",
-    profile_picture: null,
-    email_address: "",
-    google_profile_picture: null,
-  });
-  const [billingData, setBillingData] = useState([]);
+  const [profileData, setProfileData] = useState(emptyProfile);
   const [apiError, setApiError] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState(null);
-  const [plans, setPlans] = useState({});
-  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [passwordError, setPasswordError] = useState(null);
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(DEFAULT_AVATAR);
+
+  const profileQuery = useProfile();
+  const { data: planList = [] } = usePlans();
+  const { data: billingData = [] } = useInvoices();
+  const { data: subscription } = useSubscription();
+  const updateProfile = useUpdateProfile();
+  const toggleAutoRenew = useToggleAutoRenew();
+
+  const plans = planList[0] || {};
+  const profile = profileQuery.data;
+  const isSubscribed = Boolean(profile?.is_subscribed);
+  const hasPassword = profile?.has_password !== false; // Google-only accounts have none
+  const isLoading = profileQuery.isLoading || updateProfile.isPending;
+
+  // Copy the server profile into the editable form state
+  useEffect(() => {
+    if (!profile || isEditing) return;
+    const userProfile = profile.user_profile || {};
+    setProfileData({
+      id: profile.id,
+      first_name: userProfile.first_name || "",
+      last_name: userProfile.last_name || "",
+      phone_number: userProfile.phone_number || "",
+      address: userProfile.address || "",
+      company_name: userProfile.company_name || "",
+      profile_picture: userProfile.profile_picture || null,
+      google_profile_picture: userProfile.google_profile_picture || null,
+      email_address: profile.email_address,
+    });
+  }, [profile, isEditing]);
+
+  useEffect(() => {
+    if (profileQuery.isError) setApiError("Failed to load profile data.");
+  }, [profileQuery.isError]);
 
   // Update previewUrl when profile_picture changes
   useEffect(() => {
@@ -56,126 +113,69 @@ export default function ProfilePage() {
       setPreviewUrl(url);
       return () => URL.revokeObjectURL(url);
     } else if (profileData.profile_picture) {
+      const picture = profileData.profile_picture;
       setPreviewUrl(
-        `${import.meta.env.VITE_REACT_BASE_URL}${profileData.profile_picture}`
+        picture.startsWith("http") ? picture : `${import.meta.env.VITE_REACT_BASE_URL}${picture}`
       );
     } else if (profileData.google_profile_picture) {
       setPreviewUrl(profileData.google_profile_picture);
     } else {
-      setPreviewUrl(
-        "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=80&h=80&fit=crop&crop=face"
-      );
+      setPreviewUrl(DEFAULT_AVATAR);
     }
   }, [profileData.profile_picture, profileData.google_profile_picture]);
-
-  // Fetch profile and billing data on mount
-  useEffect(() => {
-    const fetchProfile = async () => {
-      setIsLoading(true);
-      try {
-        const response = await axiosInstance.get("api/auth/profile/");
-        const { id, user_profile, email_address, is_subscribed } =
-          response.data;
-        setIsSubscribed(is_subscribed);
-        setProfileData({
-          id,
-          first_name: user_profile.first_name || "",
-          last_name: user_profile.last_name || "",
-          phone_number: user_profile.phone_number || "",
-          address: user_profile.address || "",
-          company_name: user_profile.company_name || "",
-          profile_picture: user_profile.profile_picture || null,
-          google_profile_picture: user_profile.google_profile_picture || null,
-          email_address,
-        });
-      } catch (error) {
-        setApiError(
-          error.response?.data?.message || "Failed to load profile data."
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    const fetchPlans = async () => {
-      try {
-        const response = await axiosInstance.get("api/payment/all-plan/");
-        const plans = response.data[0] || [];
-        console.log("Plans fetched:", plans);
-        setPlans(plans);
-      } catch (error) {
-        setApiError(error.response?.data?.message || "Failed to load plans.");
-      }
-    };
-
-    const fetchBilling = async () => {
-      try {
-        const response = await axiosInstance.get("api/payment/me/");
-        setBillingData(response.data.invoices || []);
-      } catch (error) {
-        setApiError(
-          error.response?.data?.message || "Failed to load billing data."
-        );
-      }
-    };
-
-    fetchProfile();
-    fetchBilling();
-    fetchPlans();
-  }, []);
 
   const togglePasswordVisibility = useCallback((field) => {
     setShowPasswords((prev) => ({ ...prev, [field]: !prev[field] }));
   }, []);
 
+  const closePasswordModal = () => {
+    setShowPasswordModal(false);
+    setPasswordError(null);
+    reset();
+  };
+
   const handlePasswordUpdate = async (data) => {
-    setIsLoading(true);
-    setApiError(null);
+    setIsSavingPassword(true);
+    setPasswordError(null);
     try {
       await axiosInstance.post("api/auth/password-change/", {
         current_password: data.currentPassword,
         new_password: data.newPassword,
       });
-      setShowPasswordModal(false);
-      reset(); // Reset form fields
+      closePasswordModal();
+      notify.success("Password updated");
     } catch (error) {
-      setApiError(
-        error.response?.data?.message || "Failed to update password."
-      );
+      setPasswordError(getApiErrorMessage(error, "Failed to update password."));
     } finally {
-      setIsLoading(false);
+      setIsSavingPassword(false);
     }
   };
 
   const handleProfileUpdate = async () => {
-    setIsLoading(true);
     setApiError(null);
-    try {
-      const formData = new FormData();
-      formData.append("first_name", profileData.first_name);
-      formData.append("last_name", profileData.last_name);
-      formData.append("phone_number", profileData.phone_number);
-      formData.append("address", profileData.address);
-      formData.append("company_name", profileData.company_name);
-      if (profileData.profile_picture instanceof File) {
-        formData.append("profile_picture", profileData.profile_picture);
-      }
+    const formData = new FormData();
+    formData.append("first_name", profileData.first_name);
+    formData.append("last_name", profileData.last_name);
+    formData.append("phone_number", profileData.phone_number);
+    formData.append("address", profileData.address);
+    formData.append("company_name", profileData.company_name);
+    if (profileData.profile_picture instanceof File) {
+      formData.append("profile_picture", profileData.profile_picture);
+    }
 
-      await axiosInstance.put("api/auth/profile/", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+    try {
+      await updateProfile.mutateAsync(formData);
       setIsEditing(false);
+      notify.success("Profile updated");
     } catch (error) {
-      setApiError(error.response?.data?.message || "Failed to update profile.");
-    } finally {
-      setIsLoading(false);
+      setApiError(getApiErrorMessage(error, "Failed to update profile."));
     }
   };
 
   const renderInput = (key, label, icon) => (
     <div className="flex items-center space-x-3">
       {icon}
-      <div>
+      <div className="min-w-0">
         {isEditing ? (
           <input
             type="text"
@@ -183,10 +183,10 @@ export default function ProfilePage() {
             onChange={(e) =>
               setProfileData({ ...profileData, [key]: e.target.value })
             }
-            className="text-sm font-medium text-gray-900 border border-gray-300 rounded px-2 py-1"
+            className="text-sm font-medium text-gray-900 border border-gray-300 rounded px-2 py-1 w-full"
           />
         ) : (
-          <p className="text-sm font-medium text-gray-900">
+          <p className="text-sm font-medium text-gray-900 break-words">
             {profileData[key] || "Not set"}
           </p>
         )}
@@ -196,36 +196,52 @@ export default function ProfilePage() {
   );
 
   const handleCheckout = async () => {
+    setIsCheckingOut(true);
     try {
-      setIsLoading(true);
       const response = await axiosInstance.post(
         "api/payment/create-checkout-session/",
         {
           price_id: plans.price_id || import.meta.env.VITE_PRICE_ID,
         }
       );
-
-      if (response.status === 200) {
-        window.location.href = response.data.checkout_url;
-        setIsLoading(false);
-      }
+      window.location.href = response.data.checkout_url;
     } catch (error) {
-      console.log("Checkout error:", error);
+      console.error("Checkout error:", error);
+      notify.error(getApiErrorMessage(error, "Could not start checkout. Please try again."));
+      setIsCheckingOut(false);
+    }
+  };
+
+  const handleToggleAutoRenew = async () => {
+    const cancel = subscription?.auto_renew;
+    if (cancel) {
+      const confirmed = await confirmAction({
+        title: "Cancel your subscription?",
+        text: `You'll keep premium access until ${formatDay(subscription.end_date)}. It won't renew after that.`,
+        confirmButtonText: "Cancel subscription",
+      });
+      if (!confirmed) return;
+    }
+    try {
+      await toggleAutoRenew.mutateAsync(cancel);
+      notify.success(cancel ? "Subscription cancelled" : "Subscription resumed");
+    } catch (error) {
+      notify.error(getApiErrorMessage(error, "Could not update your subscription."));
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-8">
       {apiError && (
         <p className="text-red-500 text-sm text-center mb-4">{apiError}</p>
       )}
       {isLoading && (
         <p className="text-gray-500 text-sm text-center mb-4">Loading...</p>
       )}
-      <div className="grid grid-cols-7 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-7 gap-6">
         {/* Profile Section */}
-        <div className="col-span-5 bg-white rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between border-b border-gray-200 p-6">
+        <div className="lg:col-span-5 bg-white rounded-lg border border-gray-200 min-w-0">
+          <div className="flex flex-wrap gap-4 items-center justify-between border-b border-gray-200 p-6">
             <div className="flex items-center space-x-4">
               <div className="relative">
                 <img
@@ -250,9 +266,7 @@ export default function ProfilePage() {
                           profile_picture: file,
                         }));
                       } else {
-                        setApiError(
-                          "Image must be less than 5MB and an image file."
-                        );
+                        notify.error("Image must be less than 5MB and an image file.");
                       }
                     }}
                   />
@@ -261,7 +275,7 @@ export default function ProfilePage() {
               </div>
               <div>
                 {isEditing ? (
-                  <div className="flex space-x-2">
+                  <div className="flex flex-wrap gap-2">
                     <input
                       type="text"
                       value={profileData.first_name}
@@ -271,7 +285,7 @@ export default function ProfilePage() {
                           first_name: e.target.value,
                         })
                       }
-                      className="text-2xl font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1"
+                      className="text-xl font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 w-40"
                     />
                     <input
                       type="text"
@@ -282,7 +296,7 @@ export default function ProfilePage() {
                           last_name: e.target.value,
                         })
                       }
-                      className="text-2xl font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1"
+                      className="text-xl font-semibold text-gray-900 border border-gray-300 rounded px-2 py-1 w-40"
                     />
                   </div>
                 ) : (
@@ -293,6 +307,15 @@ export default function ProfilePage() {
                 <p className="text-gray-500">{profileData.email_address}</p>
               </div>
             </div>
+            <div className="flex gap-2">
+            {isEditing && (
+              <button
+                onClick={() => setIsEditing(false)}
+                disabled={isLoading}
+                className="text-sm text-gray-500 hover:text-gray-700 border border-gray-300 rounded-lg px-2 py-1">
+                Cancel
+              </button>
+            )}
             <button
               onClick={() =>
                 isEditing ? handleProfileUpdate() : setIsEditing(true)
@@ -306,13 +329,14 @@ export default function ProfilePage() {
                 {isEditing ? "Save Info" : "Edit Profile"}
               </span>
             </button>
+            </div>
           </div>
 
           <div className="p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-6">
               Personal Information
             </h3>
-            <div className="grid grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
               <div className="space-y-6">
                 {renderInput(
                   "phone_number",
@@ -340,28 +364,43 @@ export default function ProfilePage() {
                   "Address",
                   <MapPin className="text-gray-400" size={20} />
                 )}
-                <div
-                  onClick={() => setShowPasswordModal(true)}
-                  className="flex items-center space-x-3 cursor-pointer hover:underline">
-                  <Lock className="text-gray-400" size={20} />
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      Change Password
-                    </p>
-                    <p className="text-xs text-gray-500">Privacy</p>
+                {hasPassword ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordModal(true)}
+                    className="flex items-center space-x-3 cursor-pointer hover:underline text-left">
+                    <Lock className="text-gray-400" size={20} />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        Change Password
+                      </p>
+                      <p className="text-xs text-gray-500">Privacy</p>
+                    </div>
+                  </button>
+                ) : (
+                  <div className="flex items-center space-x-3">
+                    <Lock className="text-gray-400" size={20} />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        Signed in with Google
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Manage your password in your Google account
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
         </div>
 
         {/* Plan Card */}
-        <div className="col-span-2">
+        <div className="lg:col-span-2">
           <div className="bg-gray-900 rounded-lg p-6 text-white">
             <div className="mb-6">
               <h3 className="text-sm font-medium text-gray-300 mb-1">
-                {billingData[0]?.plan || "Monthly"}
+                {subscription?.plan_name || plans.name || "Monthly"}
               </h3>
               <p className="text-xs text-gray-400">
                 Your plan is getting started with automation
@@ -369,33 +408,54 @@ export default function ProfilePage() {
             </div>
             <div className="mb-6 flex items-baseline space-x-2">
               <span className="text-3xl font-bold text-white">
-                {plans.amount}
+                {plans.amount ? `$${plans.amount}` : "—"}
               </span>
               <span className="text-gray-400 line-through text-xs">$120</span>
             </div>
             <div className="space-y-3 mb-6">
               {plans?.descriptions?.map((feature) => (
-                <div key={feature} className="flex items-center space-x-2">
+                <div key={feature.id} className="flex items-center space-x-2">
                   <Check size={16} className="text-green-400" />
                   <span className="text-sm text-gray-300">{feature.text}</span>
                 </div>
               ))}
             </div>
-            <button
-              onClick={handleCheckout}
-              disabled={isLoading || isSubscribed}
-              className={`w-full cursor-pointer text-white font-semibold py-3 rounded-lg transition 
-    ${
-      isLoading || isSubscribed
-        ? "bg-slate-400 cursor-not-allowed"
-        : "bg-slate-500 hover:bg-blue-600"
-    }`}>
-              {isLoading
-                ? "Processing..."
-                : isSubscribed
-                ? "Already Subscribed"
-                : "Upgrade Plan"}
-            </button>
+            {isSubscribed && subscription ? (
+              <div className="space-y-3">
+                <div className="rounded-lg bg-gray-800 p-3 text-sm">
+                  <p className="text-green-400 font-medium">Premium active</p>
+                  <p className="text-gray-300">
+                    {subscription.auto_renew ? "Renews on " : "Access until "}
+                    {formatDay(subscription.end_date)}
+                  </p>
+                </div>
+                <button
+                  onClick={handleToggleAutoRenew}
+                  disabled={toggleAutoRenew.isPending}
+                  className="w-full cursor-pointer font-semibold py-3 rounded-lg transition border border-gray-600 text-gray-200 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed">
+                  {toggleAutoRenew.isPending
+                    ? "Updating..."
+                    : subscription.auto_renew
+                    ? "Cancel Subscription"
+                    : "Resume Subscription"}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleCheckout}
+                disabled={isCheckingOut || isSubscribed}
+                className={`w-full cursor-pointer text-white font-semibold py-3 rounded-lg transition ${
+                  isCheckingOut || isSubscribed
+                    ? "bg-slate-400 cursor-not-allowed"
+                    : "bg-slate-500 hover:bg-blue-600"
+                }`}>
+                {isCheckingOut
+                  ? "Processing..."
+                  : isSubscribed
+                  ? "Already Subscribed"
+                  : "Upgrade Plan"}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -480,18 +540,15 @@ export default function ProfilePage() {
                 <p className="text-sm mb-3 text-gray-500 mt-1">
                   Update your account password
                 </p>
-                {apiError && (
+                {passwordError && (
                   <p className="absolute top-14 w-full text-red-500 text-sm text-center mb-4">
-                    {apiError}
+                    {passwordError}
                   </p>
                 )}
               </div>
 
               <button
-                onClick={() => {
-                  setShowPasswordModal(false);
-                  reset();
-                }}
+                onClick={closePasswordModal}
                 className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                 <X size={20} className="text-gray-500" />
               </button>
@@ -540,16 +597,7 @@ export default function ProfilePage() {
                     placeholder="Enter new password"
                     {...register("newPassword", {
                       required: "New Password is required",
-                      minLength: {
-                        value: 8,
-                        message: "Password must be at least 8 characters",
-                      },
-                      pattern: {
-                        value:
-                          /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
-                        message:
-                          "Password must include uppercase, lowercase, number, and special character",
-                      },
+                      ...passwordRules,
                     })}
                     className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
@@ -617,22 +665,19 @@ export default function ProfilePage() {
               <div className="flex items-center justify-end space-x-3 pt-5 border-t border-gray-100">
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowPasswordModal(false);
-                    reset();
-                  }}
+                  onClick={closePasswordModal}
                   className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isLoading || Object.keys(errors).length > 0}
+                  disabled={isSavingPassword || Object.keys(errors).length > 0}
                   className={`px-6 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 ${
-                    isLoading || Object.keys(errors).length > 0
+                    isSavingPassword || Object.keys(errors).length > 0
                       ? "opacity-50 cursor-not-allowed"
                       : ""
                   }`}>
-                  {isLoading ? "Updating..." : "Update Password"}
+                  {isSavingPassword ? "Updating..." : "Update Password"}
                 </button>
               </div>
             </form>

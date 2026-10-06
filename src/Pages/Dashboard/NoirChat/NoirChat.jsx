@@ -3,15 +3,24 @@ import { User, Bot, Sparkles, Star, Zap } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { HiOutlineMicrophone } from "react-icons/hi";
 import { FaRegCircleStop } from "react-icons/fa6";
+import axiosInstance from "../../../components/axiosinstance";
+import FloatingParticles from "../../../components/FloatingParticles";
+import useSpeechRecognition from "../../../hooks/useSpeechRecognition";
+
+const loadHistory = () => {
+  try {
+    return JSON.parse(sessionStorage.getItem("chatHistory")) || [];
+  } catch {
+    return [];
+  }
+};
 
 const NoirChat = () => {
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(loadHistory);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const messagesEndRef = useRef(null);
-  const recognitionRef = useRef(null);
   const inputRef = useRef();
 
   const scrollToBottom = () => {
@@ -19,158 +28,58 @@ const NoirChat = () => {
   };
 
   useEffect(() => {
-    if (inputRef.current) {
-      const input = inputRef.current;
-      input.focus();
-    }
-  }, [messages]);
-
-  useEffect(() => {
-    // Load messages from sessionStorage on mount
-    const savedMessages = sessionStorage.getItem("chatHistory");
-    if (savedMessages) {
-      setMessages(JSON.parse(savedMessages));
-    }
-    scrollToBottom();
-  }, []);
-
-  useEffect(() => {
     // Save messages to sessionStorage whenever they change
-    if (messages.length > 0) {
-      sessionStorage.setItem("chatHistory", JSON.stringify(messages));
-      scrollToBottom();
-    }
+    sessionStorage.setItem("chatHistory", JSON.stringify(messages));
+    scrollToBottom();
+    inputRef.current?.focus();
   }, [messages]);
 
-  useEffect(() => {
-    if (
-      !("webkitSpeechRecognition" in window || "SpeechRecognition" in window)
-    ) {
-      console.warn("Speech Recognition not supported in this browser.");
-      return;
-    }
+  const sendMessage = async (text) => {
+    const userMessage = text.trim();
+    if (!userMessage || isLoading) return;
 
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setInputValue(transcript);
-    };
-
-    recognition.onerror = (event) => {
-      console.error("Speech recognition error", event.error);
-      setIsRecording(false);
-    };
-
-    recognition.onend = () => {
-      setIsRecording(false);
-      if (inputValue.trim()) {
-        handleSubmit();
-      }
-    };
-
-    recognitionRef.current = recognition;
-  }, [inputValue]);
-
-  const toggleRecording = () => {
-    if (isRecording) {
-      recognitionRef.current.stop();
-      setIsRecording(false);
-    } else {
-      try {
-        recognitionRef.current.start();
-        setIsRecording(true);
-      } catch (error) {
-        console.error("Speech recognition start error:", error);
-      }
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    if (!inputValue.trim()) return;
-
-    const userMessage = inputValue.trim();
     setInputValue("");
-
-    setMessages((prev) => [...prev, { type: "user", content: userMessage }]);
-
+    const history = [...messages, { type: "user", content: userMessage }];
+    setMessages(history);
     setIsTyping(true);
     setIsLoading(true);
 
     try {
-      const allMessages = [...messages, { type: "user", content: userMessage }];
-
-      const parts = allMessages.map((msg) => ({
-        text: msg.content,
-      }));
-
-      const res = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-goog-api-key": import.meta.env.VITE_GEMNI_API_KEY,
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: parts,
-              },
-            ],
-          }),
-        }
-      );
-
-      if (!res.ok) throw new Error("Failed to fetch Gemini API");
-
-      const data = await res.json();
-
-      const aiResponseObject = data?.candidates?.[0]?.content;
-      const aiResponseText =
-        aiResponseObject?.parts?.map((part) => part.text).join(" ") ||
-        "No response";
-
-      if (inputRef.current) {
-        const input = inputRef.current;
-        input.focus();
-      }
-
-      setMessages((prev) => [...prev, { type: "ai", content: aiResponseText }]);
+      // The backend calls the AI model, so no API key lives in the browser
+      const res = await axiosInstance.post("api/chatbot/ai-chat/", {
+        messages: history
+          .filter((msg) => !msg.isError)
+          .map((msg) => ({
+            role: msg.type === "user" ? "user" : "assistant",
+            content: msg.content,
+          })),
+      });
+      setMessages((prev) => [...prev, { type: "ai", content: res.data.reply }]);
     } catch (error) {
       console.error(error);
       setMessages((prev) => [
         ...prev,
-        { type: "ai", content: "Sorry, something went wrong." },
+        {
+          type: "ai",
+          content: error.response?.data?.error || "Sorry, something went wrong.",
+          isError: true,
+        },
       ]);
+    } finally {
+      setIsTyping(false);
+      setIsLoading(false);
     }
-
-    setIsTyping(false);
-    setIsLoading(false);
   };
 
-  const FloatingParticles = () => (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {[...Array(12)].map((_, i) => (
-        <div
-          key={i}
-          className="absolute w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full opacity-20 animate-pulse"
-          style={{
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
-            animationDelay: `${Math.random() * 3}s`,
-            animationDuration: `${2 + Math.random() * 3}s`,
-          }}
-        />
-      ))}
-    </div>
-  );
+  // Voice input: send what was said as soon as recognition finishes
+  const { isRecording, toggleRecording } = useSpeechRecognition({
+    onResult: (transcript) => sendMessage(transcript),
+  });
+
+  const handleSubmit = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    sendMessage(inputValue);
+  };
 
   return (
     <div className="flex h-screen bg-white overflow-hidden">
@@ -303,7 +212,7 @@ const NoirChat = () => {
                 ref={inputRef}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && handleSubmit(e)}
+                onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && handleSubmit(e)}
                 placeholder="Ask anything... ✨"
                 className="w-full px-6 py-4 pr-14 bg-white rounded-2xl outline-none text-black border border-gray-300 shadow-md transition-all duration-300 placeholder-gray-400 text-sm"
               />

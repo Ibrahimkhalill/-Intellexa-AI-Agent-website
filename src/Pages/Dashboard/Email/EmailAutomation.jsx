@@ -1,12 +1,44 @@
 import { useState, useEffect, useCallback } from "react";
-import { Mail, Search, Settings, LogIn } from "lucide-react";
+import { Mail, Search, LogIn } from "lucide-react";
 import { useGoogleLogin } from "@react-oauth/google";
 import axios from "axios";
 import { Bot } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import axiosInstance from "../../../components/axiosinstance";
+
+// Gmail returns base64url-encoded UTF-8; atob alone garbles non-ASCII text
+const decodeBase64Url = (data) => {
+  const binary = atob(data.replace(/-/g, "+").replace(/_/g, "/"));
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder("utf-8").decode(bytes);
+};
+
+// Find the first part with this mime type, searching nested multiparts
+// (emails with attachments wrap the text in multipart/mixed > multipart/alternative)
+const findPart = (part, mimeType) => {
+  if (!part) return null;
+  if (part.mimeType === mimeType && part.body?.data) return part;
+  for (const child of part.parts || []) {
+    const found = findPart(child, mimeType);
+    if (found) return found;
+  }
+  return null;
+};
+
+const escapeHtml = (text) =>
+  text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+const htmlToPlainText = (html) => {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("style, script, noscript").forEach((el) => el.remove());
+  const text = doc.body.textContent || "";
+  return text.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, "").trim();
+};
 
 const EmailAutomation = () => {
-  const [accessToken, setAccessToken] = useState(null);
+  const [accessToken, setAccessToken] = useState(
+    () => localStorage.getItem("gmail_access_token")
+  );
   const [emails, setEmails] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState(null);
@@ -22,40 +54,45 @@ const EmailAutomation = () => {
   const [isTyping, setIsTyping] = useState(false);
   const tags = ["Booking", "Finding", "Inquiries"];
 
+  // Gmail access tokens expire after ~1 hour - ask the user to sync again
+  const handleGmailAuthError = useCallback((err) => {
+    const status = err.response?.status;
+    if (status === 401 || status === 403) {
+      localStorage.removeItem("gmail_access_token");
+      setAccessToken(null);
+      setApiError("Your Gmail session expired. Please sync Gmail again.");
+      return true;
+    }
+    return false;
+  }, []);
+
   const login = useGoogleLogin({
     scope:
       "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify",
     onSuccess: async (tokenResponse) => {
       const token = tokenResponse.access_token;
-      setAccessToken(token);
       localStorage.setItem("gmail_access_token", token);
       setApiError(null);
-      fetchEmails(token);
+      setAccessToken(token); // the search effect below loads the inbox
     },
     onError: () => {
       setApiError("Google Login Failed");
     },
   });
 
-  const fetchEmails = async (token, pageToken = "", query = "") => {
+  const fetchEmails = useCallback(async (token, pageToken = "", query = "") => {
     setLoading(true);
     setApiError(null);
     try {
-      console.log("Fetching emails with token:", token);
       const res = await axios.get(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&pageToken=${pageToken}&q=${encodeURIComponent(
-          query
-        )}`,
+        "https://gmail.googleapis.com/gmail/v1/users/me/messages",
         {
+          params: { maxResults: 10, pageToken, q: query },
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      console.log("API Response:", res.data);
 
       const messages = res.data.messages || [];
-      if (messages.length === 0) {
-        console.log("No emails found for query:", query);
-      }
       setNextPageToken(res.data.nextPageToken || null);
 
       const detailedEmails = await Promise.all(
@@ -63,6 +100,7 @@ const EmailAutomation = () => {
           const msgRes = await axios.get(
             `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`,
             {
+              params: { format: "metadata" },
               headers: { Authorization: `Bearer ${token}` },
             }
           );
@@ -93,21 +131,17 @@ const EmailAutomation = () => {
       );
 
       setEmails(detailedEmails);
-      if (detailedEmails.length > 0) setSelectedEmail(detailedEmails[0].id);
-      else setSelectedEmail(null);
+      setSelectedEmail(detailedEmails.length > 0 ? detailedEmails[0].id : null);
     } catch (err) {
       console.error("Email fetch failed:", err.response?.data || err);
-      setApiError(
-        err.response?.data?.error?.message || "Failed to fetch emails."
-      );
-      if (err.response?.status === 401 || err.response?.status === 403) {
-        localStorage.removeItem("gmail_access_token");
-        setAccessToken(null);
-        setApiError("Please re-authenticate with Gmail.");
+      if (!handleGmailAuthError(err)) {
+        setApiError(
+          err.response?.data?.error?.message || "Failed to fetch emails."
+        );
       }
     }
     setLoading(false);
-  };
+  }, [handleGmailAuthError]);
 
   const fetchEmailBody = async (emailId, token) => {
     setBodyLoading(true);
@@ -121,160 +155,91 @@ const EmailAutomation = () => {
         }
       );
       const payload = msgRes.data.payload;
+      const htmlPart = findPart(payload, "text/html");
+      const textPart = findPart(payload, "text/plain");
+
       let body = "";
-
-      if (payload.parts) {
-        const textPart = payload.parts.find(
-          (part) => part.mimeType === "text/plain"
-        );
-        const htmlPart = payload.parts.find(
-          (part) => part.mimeType === "text/html"
-        );
-        if (htmlPart && htmlPart.body && htmlPart.body.data) {
-          body = atob(htmlPart.body.data.replace(/-/g, "+").replace(/_/g, "/"));
-        } else if (textPart && textPart.body && textPart.body.data) {
-          body = atob(textPart.body.data.replace(/-/g, "+").replace(/_/g, "/"));
-        }
-      } else if (
-        payload.mimeType === "text/plain" ||
-        payload.mimeType === "text/html"
-      ) {
-        if (payload.body && payload.body.data) {
-          body = atob(payload.body.data.replace(/-/g, "+").replace(/_/g, "/"));
-        }
+      if (htmlPart) {
+        body = decodeBase64Url(htmlPart.body.data);
+      } else if (textPart) {
+        // Keep line breaks of plain-text emails inside the iframe
+        body = `<pre style="white-space:pre-wrap;font-family:inherit">${escapeHtml(
+          decodeBase64Url(textPart.body.data)
+        )}</pre>`;
       }
-
       setEmailBody(body);
     } catch (err) {
       console.error("Email body fetch failed:", err);
-      localStorage.removeItem("gmail_access_token");
-      setAccessToken(null);
-      window.location.reload();
-      setBodyError(
-        err.response?.data?.error?.message || "Failed to fetch email body."
-      );
+      if (!handleGmailAuthError(err)) {
+        setBodyError(
+          err.response?.data?.error?.message || "Failed to fetch email body."
+        );
+      }
     }
     setBodyLoading(false);
   };
 
   const sendToAI = async () => {
-    if (!message.trim() || !selectedEmail || !accessToken) return;
+    if (!message.trim() || !selectedEmail || !accessToken || isTyping) return;
     setIsTyping(true);
+    const emailId = selectedEmail;
     const userMessage = message.trim();
-    const timestamp = new Date().toISOString();
+    const history = [
+      ...(conversation[emailId] || []),
+      { type: "user", message: userMessage, timestamp: new Date().toISOString() },
+    ];
 
-    setConversation((prev) => ({
-      ...prev,
-      [selectedEmail]: [
-        ...(prev[selectedEmail] || []),
-        { type: "user", message: userMessage, timestamp },
-      ],
-    }));
-
+    setConversation((prev) => ({ ...prev, [emailId]: history }));
     setMessage("");
     setBodyError(null);
 
     try {
-      const previousMessages = conversation[selectedEmail] || [];
-
-      function htmlToPlainText(html) {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, "text/html");
-        doc
-          .querySelectorAll("style, script, noscript")
-          .forEach((el) => el.remove());
-        const text = doc.body.textContent || "";
-        return text.replace(/[\u200B-\u200D\uFEFF\u00AD]/g, "").trim();
-      }
-
-      const plainTextEmailBody = htmlToPlainText(emailBody);
-
-      console.log("plainTextEmailBody", plainTextEmailBody);
-
-      const parts = [
-        { text: `Context: ${plainTextEmailBody}` },
-        ...previousMessages.flatMap((msg) => [{ text: msg.message }]),
-        { text: userMessage },
-      ];
-
-      const res = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-goog-api-key":
-              import.meta.env.VITE_GEMNI_API_KEY || "your_api_key_here",
-          },
-          body: JSON.stringify({
-            contents: [{ parts }],
-          }),
-        }
-      );
-
-      if (!res.ok) throw new Error("Failed to fetch Gemini API");
-
-      const data = await res.json();
-
-      const aiResponseObject = data?.candidates?.[0]?.content;
-      const aiResponseText =
-        aiResponseObject?.parts?.map((part) => part.text).join(" ") ||
-        "No response";
+      // The backend calls the AI model with the email as context
+      const res = await axiosInstance.post("api/chatbot/ai-chat/", {
+        context: htmlToPlainText(emailBody),
+        messages: history
+          .filter((msg) => !msg.isError)
+          .map((msg) => ({
+            role: msg.type === "user" ? "user" : "assistant",
+            content: msg.message,
+          })),
+      });
 
       setConversation((prev) => ({
         ...prev,
-        [selectedEmail]: [
-          ...(prev[selectedEmail] || []),
+        [emailId]: [
+          ...(prev[emailId] || []),
           {
             type: "ai",
-            message: aiResponseText,
+            message: res.data.reply,
             timestamp: new Date().toISOString(),
           },
         ],
       }));
-      setIsTyping(false);
     } catch (err) {
       console.error("AI request failed:", err);
-      setBodyError(err.message || "Failed to get AI response.");
+      setBodyError(err.response?.data?.error || "Failed to get AI response.");
+    } finally {
       setIsTyping(false);
     }
   };
 
-  const debouncedFetchEmails = useCallback(() => {
-    if (accessToken) {
+  // Load the inbox when the token is available and whenever the search changes
+  useEffect(() => {
+    if (!accessToken) return;
+    const handler = setTimeout(() => {
       setPageTokens([""]);
       setNextPageToken(null);
       fetchEmails(accessToken, "", searchQuery);
-    }
-  }, [accessToken, searchQuery]);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      debouncedFetchEmails();
     }, 500);
     return () => clearTimeout(handler);
-  }, [searchQuery, debouncedFetchEmails]);
-
-  useEffect(() => {
-    const token = localStorage.getItem("gmail_access_token");
-    if (token) {
-      setAccessToken(token);
-      fetchEmails(token).catch((err) => {
-        if (err.response?.status === 403 || err.response?.status === 401) {
-          localStorage.removeItem("gmail_access_token");
-          setAccessToken(null);
-          setApiError("Please re-authenticate with Gmail.");
-        }
-      });
-    } else {
-      setLoading(false);
-    }
-  }, []);
+  }, [accessToken, searchQuery, fetchEmails]);
 
   useEffect(() => {
     if (selectedEmail && accessToken) {
       fetchEmailBody(selectedEmail, accessToken);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEmail, accessToken]);
 
   function extractName(fullSender) {
@@ -306,7 +271,6 @@ const EmailAutomation = () => {
                 Clear
               </button>
             )}
-            <Settings className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer" />
           </div>
         </div>
         {loading ? (
@@ -419,7 +383,7 @@ const EmailAutomation = () => {
               className="flex flex-col overflow-y-auto space-y-4 p-6 bg-gray-50"
               style={{ height: "600px" }}>
               <iframe
-                srcDoc={emailBody}
+                srcDoc={bodyLoading ? "<p style=\"font-family:sans-serif;color:#6b7280\">Loading email...</p>" : emailBody}
                 sandbox=""
                 style={{ width: "100%", height: "100%", border: "none" }}
               />
@@ -458,10 +422,10 @@ const EmailAutomation = () => {
                             <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
                             <div
                               className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"
-                              style={{ rebellionDelay: "0.1s" }}></div>
+                              style={{ animationDelay: "0.1s" }}></div>
                             <div
                               className="w-2 h-2 bg-teal-400 rounded-full animate-bounce"
-                              style={{ rebellionDelay: "0.2s" }}></div>
+                              style={{ animationDelay: "0.2s" }}></div>
                           </div>
                           <span className="text-gray-400 text-sm">
                             AI is thinking...

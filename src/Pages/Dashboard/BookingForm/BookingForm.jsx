@@ -1,25 +1,34 @@
 import { useState, useEffect } from "react";
 import { ChevronDown, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 
-import { useParams } from "react-router-dom";
-import axiosInstance from "../../../components/axiosinstance";
+import { useNavigate, useParams } from "react-router-dom";
+import { useBooking, useSaveBooking } from "../../../hooks/useApi";
+import { notify } from "../../../utils/notify";
+
+const toTime = (dateString) => new Date(dateString).toTimeString().slice(0, 5);
 
 export default function BookingForm() {
-  const today = new Date();
-  const twoDaysLater = new Date(today);
-  twoDaysLater.setDate(today.getDate() + 2);
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const navigate = useNavigate();
+  const { bookingId } = useParams(); // present when editing an existing booking
+  const isEditing = Boolean(bookingId);
 
   const [formData, setFormData] = useState({
     bookingType: "",
     location: "",
-    checkIn: formatDate(today),
-    checkOut: formatDate(today),
+    checkIn: formatDate(tomorrow),
+    checkOut: formatDate(tomorrow),
+    startTime: "10:00",
+    endTime: "12:00",
   });
   const [calendarOpen, setCalendarOpen] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const { bookingId } = useParams(); // To prefill form if editing an existing booking
+
+  const { data: booking, isLoading: bookingLoading, isError: bookingError } = useBooking(bookingId);
+  const saveBooking = useSaveBooking();
+  const loading = bookingLoading || saveBooking.isPending;
 
   const bookingTypes = [
     { value: "flight", label: "Flight Booking" },
@@ -30,46 +39,21 @@ export default function BookingForm() {
     { value: "hotel", label: "Hotel Reservation" },
   ];
 
-  // Fetch existing booking if bookingId is provided
+  // Prefill the form when editing
   useEffect(() => {
-    if (bookingId) {
-      const fetchBooking = async () => {
-        setLoading(true);
-        setError(null);
-        try {
-          const response = await axiosInstance.get(`api/booking/list/`);
-          const booking = response.data.find(
-            (b) => b.id === parseInt(bookingId)
-          );
-          if (booking) {
-            setFormData({
-              fullName: "", // API doesn't provide this, so keep empty
-              phoneNumber: "", // API doesn't provide this
-              bookingType: booking.booking_type,
-              location: booking.location,
-              adults: booking.guests || 1,
-              children: 0, // API doesn't provide this
-              checkIn: formatDate(new Date(booking.booking_datetime)),
-              checkOut: formatDate(
-                new Date(
-                  new Date(booking.booking_datetime).setDate(
-                    new Date(booking.booking_datetime).getDate() + 2
-                  )
-                )
-              ),
-              specialRequests: "", // API doesn't provide this
-            });
-          }
-        } catch (err) {
-          setError("Failed to fetch booking details.");
-          console.error(err);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchBooking();
-    }
-  }, [bookingId]);
+    if (!booking) return;
+    const start = new Date(booking.booking_datetime);
+    const end = booking.booking_end_date ? new Date(booking.booking_end_date) : start;
+    setFormData({
+      bookingType: booking.booking_type,
+      location: booking.location || "",
+      checkIn: formatDate(start),
+      checkOut: formatDate(end),
+      startTime: toTime(booking.booking_datetime),
+      endTime: booking.booking_end_date ? toTime(booking.booking_end_date) : toTime(booking.booking_datetime),
+    });
+    setCurrentMonth(start);
+  }, [booking]);
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({
@@ -115,10 +99,8 @@ export default function BookingForm() {
     if (calendarOpen === "checkin") {
       handleInputChange("checkIn", formattedDate);
       const checkOutDate = parseDate(formData.checkOut);
-      if (date >= checkOutDate) {
-        const newCheckOut = new Date(date);
-        newCheckOut.setDate(date.getDate() + 2);
-        handleInputChange("checkOut", formatDate(newCheckOut));
+      if (date > checkOutDate) {
+        handleInputChange("checkOut", formattedDate);
       }
     } else if (calendarOpen === "checkout") {
       handleInputChange("checkOut", formattedDate);
@@ -126,17 +108,22 @@ export default function BookingForm() {
     setCalendarOpen(null);
   };
 
+  const combineDateTime = (dateString, timeString) => {
+    const date = parseDate(dateString);
+    const [hours, minutes] = (timeString || "00:00").split(":").map(Number);
+    date.setHours(hours, minutes, 0, 0);
+    return date;
+  };
+
   const isDateDisabled = (date) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    date.setHours(0, 0, 0, 0);
 
     if (calendarOpen === "checkin") {
       return date < today;
     } else if (calendarOpen === "checkout") {
-      const checkInDate = parseDate(formData.checkIn);
-      checkInDate.setHours(0, 0, 0, 0);
-      return date < today || date <= checkInDate;
+      // Same-day end is allowed (e.g. a restaurant or spa booking)
+      return date < today || date < parseDate(formData.checkIn);
     }
     return false;
   };
@@ -151,29 +138,40 @@ export default function BookingForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
+    const start = combineDateTime(formData.checkIn, formData.startTime);
+    const end = combineDateTime(formData.checkOut, formData.endTime);
+    if (start <= new Date()) {
+      setError("The booking start time must be in the future.");
+      return;
+    }
+    if (end < start) {
+      setError("The end time must be after the start time.");
+      return;
+    }
+
     try {
       const payload = {
         booking_type: formData.bookingType,
         location: formData.location,
-        booking_datetime: parseDate(formData.checkIn).toISOString(),
-        booking_end_date: parseDate(formData.checkOut).toISOString(),
+        booking_datetime: start.toISOString(),
+        booking_end_date: end.toISOString(),
       };
-      await axiosInstance.post("api/booking/create/", payload);
-      // Optionally redirect or show success message
-      alert("Booking created successfully!");
-      setFormData({
-        bookingType: "",
-        location: "",
-        checkIn: formatDate(today),
-        checkOut: formatDate(today),
-      });
+      await saveBooking.mutateAsync({ id: bookingId, payload });
+      notify.success(
+        isEditing ? "Booking updated" : "Booking created",
+        "We'll remind you before it starts."
+      );
+      navigate("/booking-list");
     } catch (err) {
-      setError("Failed to create booking. Please try again.");
+      // Show the first validation message from the backend if there is one
+      const data = err.response?.data;
+      const firstFieldError =
+        data && typeof data === "object"
+          ? Object.values(data).flat().find((msg) => typeof msg === "string")
+          : null;
+      setError(firstFieldError || "Failed to save booking. Please try again.");
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -276,10 +274,10 @@ export default function BookingForm() {
           <div className="p-6">
             <div className="flex items-center justify-between flex-col gap-2">
               <h2 className="text-lg text-center font-semibold text-gray-800">
-                Add New Booking
+                {isEditing ? "Edit Booking" : "Add New Booking"}
               </h2>
               <p className="text-sm text-gray-500">
-                Ready? Let's finish the booking confirmation.
+                Ready? Let&apos;s finish the booking confirmation.
               </p>
             </div>
           </div>
@@ -428,12 +426,39 @@ export default function BookingForm() {
                     {calendarOpen === "checkout" && <CalendarComponent />}
                   </div>
                 </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    {formData.bookingType === "flight" ? "Departure Time" : "Start Time"}
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.startTime}
+                    onChange={(e) => handleInputChange("startTime", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none bg-white"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    {formData.bookingType === "flight" ? "Return Time" : "End Time"}
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.endTime}
+                    onChange={(e) => handleInputChange("endTime", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none bg-white"
+                    required
+                  />
+                </div>
               </div>
             </div>
 
             {/* Special Requests */}
 
             {/* Error Message */}
+            {bookingError && (
+              <p className="text-red-500 text-sm text-center">Booking not found.</p>
+            )}
             {error && (
               <p className="text-red-500 text-sm text-center">{error}</p>
             )}
@@ -442,8 +467,8 @@ export default function BookingForm() {
             <button
               type="submit"
               className="w-full bg-teal-600 text-white py-2.5 px-4 rounded-md hover:bg-teal-700 transition-colors font-medium"
-              disabled={loading}>
-              Confirm
+              disabled={loading || bookingError}>
+              {isEditing ? "Save Changes" : "Confirm"}
             </button>
           </form>
         </div>

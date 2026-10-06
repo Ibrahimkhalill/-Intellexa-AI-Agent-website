@@ -4,13 +4,14 @@ import { Link } from "react-router-dom";
 import { FaEnvelope } from "react-icons/fa";
 import logo from "../../assets/logo/logo.png";
 import axiosInstance from "../../components/axiosinstance";
+import { getApiErrorMessage } from "../../utils/validation";
 
-const ForgetEmail = ({ onSuccess }) => {
+const ForgetEmail = ({ onSuccess, defaultEmail = "" }) => {
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm();
+  } = useForm({ defaultValues: { email: defaultEmail } });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState(null);
 
@@ -24,24 +25,10 @@ const ForgetEmail = ({ onSuccess }) => {
           email: data.email,
         }
       );
-      console.log("OTP sent successfully:", response.data);
-      // Store user_id or email for OTP verification
-      const userId = response.data.user_id; // Adjust based on actual API response
-
-      if (userId) {
-        localStorage.setItem("user_id", userId);
-      }
-      // Navigate to OTP verification page
-
-      onSuccess(userId);
+      // Move on to OTP verification
+      onSuccess(response.data.user_id, data.email);
     } catch (error) {
-      if (error.response) {
-        setApiError(
-          error.response.data.message || "Failed to send OTP. Please try again."
-        );
-      } else {
-        setApiError("Network error. Please check your connection.");
-      }
+      setApiError(getApiErrorMessage(error, "Failed to send OTP. Please try again."));
     } finally {
       setIsSubmitting(false);
     }

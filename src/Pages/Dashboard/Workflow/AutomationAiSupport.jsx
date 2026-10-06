@@ -1,13 +1,13 @@
-import React from "react";
+import { Fragment } from "react";
 import { ArrowRight } from "lucide-react";
 import flightImg from "../../../assets/images/flight.svg";
 import flightImg1 from "../../../assets/images/fliegt_book.svg";
 import restaurantImg from "../../../assets/images/restaurant.svg";
 import spaImg from "../../../assets/images/Spa.svg";
-import birthdayImg from "../../../assets/images/birthday.svg";
+import birthdayImg from "../../../assets/images/Birthday.svg";
 import concertImg from "../../../assets/images/concert.svg";
 import emailImg from "../../../assets/images/email.svg";
-import hotelImg from "../../../assets/images/hotel.svg";
+import hotelImg from "../../../assets/images/Hotel.svg";
 import aiImg from "../../../assets/images/ChatGPT.svg";
 import documentImg from "../../../assets/images/Live.svg";
 import BookNow from "../../../assets/images/BookNow.svg";
@@ -86,7 +86,7 @@ const AutomationAiSupport = () => {
               className="bg-[#F5F4F0] rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer">
               <div className="flex items-center justify-center space-x-2 mb-4">
                 {template.icons.map((image, iconIndex) => (
-                  <React.Fragment key={iconIndex}>
+                  <Fragment key={iconIndex}>
                     <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center">
                       <img
                         src={image}
@@ -97,7 +97,7 @@ const AutomationAiSupport = () => {
                     {iconIndex < template.icons.length - 1 && (
                       <ArrowRight className="w-5 h-5 text-gray-400" />
                     )}
-                  </React.Fragment>
+                  </Fragment>
                 ))}
               </div>
               <h3 className="font-semibold text-gray-900 mb-2">

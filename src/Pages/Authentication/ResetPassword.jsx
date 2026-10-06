@@ -3,7 +3,9 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import logo from "../../assets/logo/logo.png";
+import { notify } from "../../utils/notify";
 import axiosInstance from "../../components/axiosinstance";
+import { getApiErrorMessage, passwordRules } from "../../utils/validation";
 
 const ResetPassword = ({ user_id, secret_key }) => {
   const {
@@ -41,30 +43,15 @@ const ResetPassword = ({ user_id, secret_key }) => {
     setIsSubmitting(true);
     setApiError(null);
     try {
-      const response = await axiosInstance.post(
-        "api/auth/password-reset/confirm/",
-        {
-          user_id: userId,
-          secret_key: secretKey,
-          new_password: data.newPassword,
-        }
-      );
-      console.log("Password reset successful:", response.data);
-      // Clear stored data
-      localStorage.removeItem("user_id");
-      localStorage.removeItem("secret_key");
-      localStorage.removeItem("resetEmail");
-      // Navigate to sign-in page
+      await axiosInstance.post("api/auth/password-reset/confirm/", {
+        user_id: userId,
+        secret_key: secretKey,
+        new_password: data.newPassword,
+      });
+      notify.success("Password reset", "You can now sign in with your new password.");
       navigate("/signin");
     } catch (error) {
-      if (error.response) {
-        setApiError(
-          error.response.data.message ||
-            "Failed to reset password. Please try again."
-        );
-      } else {
-        setApiError("Network error. Please check your connection.");
-      }
+      setApiError(getApiErrorMessage(error, "Failed to reset password. Please try again."));
     } finally {
       setIsSubmitting(false);
     }
@@ -119,16 +106,7 @@ const ResetPassword = ({ user_id, secret_key }) => {
                   type={showPassword ? "text" : "password"}
                   {...register("newPassword", {
                     required: "New password is required",
-                    minLength: {
-                      value: 8,
-                      message: "Password must be at least 8 characters",
-                    },
-                    pattern: {
-                      value:
-                        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
-                      message:
-                        "Password must include uppercase, lowercase, number, and special character",
-                    },
+                    ...passwordRules,
                   })}
                   placeholder="Enter your new password"
                   className="w-full border border-base-300 bg-base-200 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
